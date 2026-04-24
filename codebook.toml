@@ -1,0 +1,15 @@
+words = [
+    "adf",
+    "dbname",
+    "ddoc",
+    "fieldnames",
+    "gtfs",
+    "ibmclouddb",
+    "lbl",
+    "locustfile",
+    "pctile",
+    "pctiles",
+    "sslmode",
+    "sslrootcert",
+    "udf",
+]
