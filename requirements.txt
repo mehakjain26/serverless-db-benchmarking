@@ -15,7 +15,7 @@ fonttools==4.62.1
 gevent==25.9.1
 geventhttpclient==2.3.9
 greenlet==3.4.0
--e file:///Users/zheskett/cs/cs551/final_project
+-e ./server
 h11==0.16.0
 ibm-cloud-sdk-core==3.24.4
 ibmcloudant==0.11.5
