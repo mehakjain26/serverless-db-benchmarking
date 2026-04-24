@@ -3,3 +3,4 @@ codebook.toml
 .venv/*
 results/*
 .DS_Store
+data/*
