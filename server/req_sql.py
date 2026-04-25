@@ -59,6 +59,23 @@ SQL = {
 WRITES = {RequestType.BULK_UPDATE_DEPARTURES}
 
 
+def sample_catalog(cur: pe.cursor, transport_id: int, n: int = 100) -> list[dict]:
+    # Fetch a mix of stops and trips to satisfy all RequestType requirements
+    cur.execute(
+        """
+        SELECT st.gtfs_stop_id, st.gtfs_trip_id
+        FROM stop_times st
+        WHERE st.transport_id = %s
+        LIMIT %s
+    """,
+        (transport_id, n),
+    )
+    return [
+        {"transport_id": transport_id, "stop_id": r[0], "trip_id": r[1]}
+        for r in cur.fetchall()
+    ]
+
+
 def execute(conn: pe.connection, cur: pe.cursor, req: Request) -> tuple[list, float]:
     start = time.perf_counter()
     cur.execute(SQL[req.type], req.params)

@@ -1,0 +1,9 @@
+To check via ibm cloudshell: ibmcloud plugin install cloud-databases; psql
+
+Use cert.py to connect to ibm db
+Use setup_db.py to create tables.
+Use ingest.py to push data
+Ignore others
+
+python3 ingest.py "atlanta.zip" "Atlanta" 2
+python3 ingest.py "columbus.zip" "Columbus" 3
