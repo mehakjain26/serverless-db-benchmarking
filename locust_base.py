@@ -1,9 +1,15 @@
+import json
 import time
+from pathlib import Path
 
 from locust import HttpUser, User, between, events, task
 
 import globals as G
 from req_gen import RequestType, build
+
+_CATALOG_PATH = Path(__file__).parent / "catalog_cache.json"
+with open(_CATALOG_PATH) as _f:
+    _CATALOG: list[dict] = json.load(_f)
 
 
 class BenchmarkTasks:
@@ -61,6 +67,8 @@ class BenchmarkUser(BenchmarkTasks, User):
             rows, _ = self.execute_op(req)
         except Exception as e:
             exc = e
+            if G.FAILURE_BACKOFF_SECS > 0:
+                time.sleep(G.FAILURE_BACKOFF_SECS)
         events.request.fire(
             request_type="DB",
             name=rtype.value,
@@ -71,10 +79,8 @@ class BenchmarkUser(BenchmarkTasks, User):
 
 
 class BenchmarkHttpUser(BenchmarkTasks, HttpUser):
-    abstract = True
-
     def on_start(self) -> None:
-        raise NotImplementedError
+        self.catalog = _CATALOG
 
     def run_op(self, rtype: RequestType) -> None:
         req = build(rtype, self.catalog)

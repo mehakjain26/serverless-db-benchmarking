@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 import psycopg2
@@ -12,11 +13,14 @@ CATALOG_PATH = Path(__file__).parent.parent / "catalog_cache.json"
 with open(CATALOG_PATH) as f:
     CATALOG: list[dict] = json.load(f)
 
+DB_CONFIGS = {"postgres": G.POSTGRES, "neon": G.NEON}
+DB_CREDS = DB_CONFIGS[os.environ.get("BENCH_DB", "postgres")]
+
 
 class SQLUser(BenchmarkUser):
     def on_start(self):
         try:
-            self.conn = psycopg2.connect(**G.POSTGRES)
+            self.conn = psycopg2.connect(**DB_CREDS)
             self.cur  = self.conn.cursor()
             self.catalog = CATALOG
         except Exception as e:

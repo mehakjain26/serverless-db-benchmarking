@@ -1,3 +1,5 @@
+import argparse
+
 import psycopg2
 import rich
 
@@ -95,7 +97,12 @@ INDICES = [
 
 
 def main():
-    conn = psycopg2.connect(**SG.POSTGRES)
+    p = argparse.ArgumentParser()
+    p.add_argument("--db", default="postgres", choices=list(SG.POSTGRES_DBS))
+    args = p.parse_args()
+
+    rich.print(f"  [dim]db[/dim]  {args.db}")
+    conn = psycopg2.connect(**SG.get_postgres(args.db))
     cur = conn.cursor()
 
     for sql in TABLES:

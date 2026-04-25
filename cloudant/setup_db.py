@@ -59,6 +59,12 @@ DESIGN_DOCS = {
 def main():
     client = get_client()
 
+    try:
+        client.put_database(db=DB)
+        rich.print(f"  [dim]created[/dim]  database '{DB}'")
+    except Exception:
+        rich.print(f"  [dim]exists[/dim]   database '{DB}'")
+
     for ddoc_name, views in DESIGN_DOCS.items():
         built_views = {}
         for view_name, view_def in views.items():
@@ -67,16 +73,20 @@ def main():
                 reduce=view_def.get("reduce"),
             )
 
+        from ibm_cloud_sdk_core.api_exception import ApiException
+        rev = None
+        action = "created"
         try:
             existing = client.get_design_document(db=DB, ddoc=ddoc_name).get_result()
-            rev = existing["_rev"]
+            rev = existing.get("_rev")
             action = "updated"
-        except Exception:
-            rev = None
-            action = "created"
+        except ApiException as e:
+            if e.status_code != 404:
+                raise
 
-        ddoc = DesignDocument(views=built_views, rev=rev)
-        client.put_design_document(db=DB, ddoc=ddoc_name, design_document=ddoc)
+        ddoc = DesignDocument(views=built_views)
+        kwargs = {"if_match": rev} if rev else {}
+        client.put_design_document(db=DB, ddoc=ddoc_name, design_document=ddoc, **kwargs)
         rich.print(f"  [dim]{action}[/dim]  _design/{ddoc_name}")
 
     rich.print("[green]Done.[/green]")

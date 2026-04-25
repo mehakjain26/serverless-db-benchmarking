@@ -45,7 +45,8 @@ class Request:
 
 
 def build(rtype: RequestType, catalog: "list[dict]") -> Request:
-    entry = catalog[rng.integers(len(catalog))]
+    # Writes always target catalog[0] so all concurrent users contend on the same rows.
+    entry = catalog[0] if rtype is RequestType.BULK_UPDATE_DEPARTURES else catalog[rng.integers(len(catalog))]
     t = entry["transport_id"]
     match rtype:
         case RequestType.POINT_READ:
