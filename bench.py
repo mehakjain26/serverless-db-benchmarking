@@ -26,6 +26,9 @@ ADAPTER_ALIASES = {
 }
 
 
+OP_CHOICES = ["point_read", "next_departures", "large_scan", "trips_per_route", "bulk_update_departures"]
+
+
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--mode", choices=["direct", "http"], default="direct")
@@ -33,6 +36,8 @@ def parse_args():
     p.add_argument("--users", nargs="+", type=int, default=G.CONCURRENCY_LEVELS, metavar="N")
     p.add_argument("--spawn", type=int, default=G.SPAWN_RATE)
     p.add_argument("--time", default=G.RUN_TIME)
+    p.add_argument("--op", choices=OP_CHOICES, default=None, metavar="OP",
+                   help="run only this operation type")
     p.add_argument("--label", default="", help="human-readable name for this run (used in plot titles)")
     for name in FUNCTION_URLS:
         p.add_argument(f"--url-{name}", default=None, metavar="URL")
@@ -109,6 +114,7 @@ def main():
             if i > 0 and G.COOLDOWN_SECS > 0:
                 rich.print(f"\n[dim]Cooling down {G.COOLDOWN_SECS}s...[/dim]")
                 time.sleep(G.COOLDOWN_SECS)
+            op_env = {"BENCH_OP": args.op} if args.op else {}
             run_locust(
                 adapter=adapter,
                 locustfile=locustfile,
@@ -117,7 +123,7 @@ def main():
                 spawn=args.spawn,
                 run_time=args.time,
                 label=f"{run_stem}_{users}u",
-                extra_env=alias_env,
+                extra_env={**alias_env, **op_env},
             )
 
     rich.print(f"\n[green]All runs complete.[/green] Results in [bold]{RESULTS}/[/bold]")

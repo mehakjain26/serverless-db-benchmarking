@@ -77,6 +77,10 @@ def load_history() -> "dict[str, pd.DataFrame]":
         df = pd.read_csv(path)
         t0 = df["Timestamp"].min()
         df["elapsed_s"] = df["Timestamp"] - t0
+        pct_cols = ["50%", "66%", "75%", "80%", "90%", "95%", "98%", "99%"]
+        for col in pct_cols:
+            if col in df.columns:
+                df[col] = df[col].replace(0, float("nan")).ffill()
         result[m.group(1)] = df
     return result
 
@@ -398,120 +402,95 @@ def fig_user_count(
 def fig_latency_per_op(
     history: "dict[str, pd.DataFrame]", labels: dict, show: bool
 ) -> None:
-    """One image per concurrency level, 5 subplots (one per op), p50/p95 lines over time."""
+    """One image per (service, user count), 5 subplots (one per op), p50+p95 lines."""
     if not history:
         return
     out = subdir("latency_per_op")
-    colors = ["#4C72B0", "#DD8452", "#55A868", "#C44E52", "#8172B2", "#937860"]
 
-    by_users: "dict[str, list[str]]" = {}
-    for run_key in history:
+    for run_key, hdf in sorted(history.items()):
         m = re.match(r"(.+)_(direct|http)_(\d+)u$", run_key)
-        if m:
-            by_users.setdefault(m.group(3), []).append(run_key)
+        if not m:
+            continue
+        lbl = run_label(labels, m.group(1), m.group(2))
+        users = m.group(3)
 
-    for users, run_keys in sorted(by_users.items(), key=lambda x: int(x[0])):
-        ops_in_runs = [
-            op for op in OP_ORDER
-            if any(op in history[rk]["Name"].values for rk in run_keys)
-        ]
-        if not ops_in_runs:
+        ops_in_run = [op for op in OP_ORDER if op in hdf["Name"].values]
+        if not ops_in_run:
             continue
 
         ncols = 3
-        nrows = -(-len(ops_in_runs) // ncols)
+        nrows = -(-len(ops_in_run) // ncols)
         fig, axes = plt.subplots(nrows, ncols, figsize=(6 * ncols, 3.5 * nrows))
         axes_flat = axes.flatten() if hasattr(axes, "flatten") else [axes]
         fig.suptitle(
-            f"Latency Over Time by Operation ({users} Users)",
+            f"{lbl}: Latency Over Time ({users} Users)",
             fontsize=13, fontweight="bold",
         )
 
-        for i, op in enumerate(ops_in_runs):
+        for i, op in enumerate(ops_in_run):
             ax = axes_flat[i]
-            for j, run_key in enumerate(sorted(run_keys)):
-                m = re.match(r"(.+)_(direct|http)_(\d+)u$", run_key)
-                lbl = run_label(labels, m.group(1), m.group(2)) if m else run_key
-                odf = history[run_key][history[run_key]["Name"] == op]
-                if odf.empty:
-                    continue
-                col = colors[j % len(colors)]
-                ax.plot(odf["elapsed_s"], odf["50%"], linewidth=2, color=col,
-                        label=f"{lbl} p50")
-                ax.plot(odf["elapsed_s"], odf["95%"], linewidth=1.5, color=col,
-                        linestyle="--", label=f"{lbl} p95")
+            odf = hdf[hdf["Name"] == op]
+            ax.plot(odf["elapsed_s"], odf["50%"], linewidth=2,
+                    color=PCTILE_COLORS["p50"])
             ax.set_title(op.replace("_", " ").title(), fontsize=10)
             ax.set_xlabel("elapsed (s)", fontsize=9)
-            ax.set_ylabel("latency (ms)", fontsize=9)
-            ax.legend(fontsize=7)
+            ax.set_ylabel("p50 latency (ms)", fontsize=9)
             ax.grid(True)
             ax.set_ylim(bottom=0)
 
-        for j in range(len(ops_in_runs), len(axes_flat)):
+        for j in range(len(ops_in_run), len(axes_flat)):
             axes_flat[j].set_visible(False)
 
         fig.tight_layout()
-        save(fig, out / f"{users}u.png", show)
+        save(fig, out / f"{run_key}.png", show)
 
 
 def fig_failures_per_op(
     history: "dict[str, pd.DataFrame]", labels: dict, show: bool
 ) -> None:
-    """One image per concurrency level, 5 subplots (one per op), failure rate lines over time."""
+    """One image per (service, user count), 5 subplots (one per op), failure rate line."""
     if not history:
         return
     out = subdir("failures_per_op")
-    colors = ["#4C72B0", "#DD8452", "#55A868", "#C44E52", "#8172B2", "#937860"]
 
-    by_users: "dict[str, list[str]]" = {}
-    for run_key in history:
+    for run_key, hdf in sorted(history.items()):
         m = re.match(r"(.+)_(direct|http)_(\d+)u$", run_key)
-        if m:
-            by_users.setdefault(m.group(3), []).append(run_key)
+        if not m:
+            continue
+        lbl = run_label(labels, m.group(1), m.group(2))
+        users = m.group(3)
 
-    for users, run_keys in sorted(by_users.items(), key=lambda x: int(x[0])):
-        ops_in_runs = [
-            op for op in OP_ORDER
-            if any(op in history[rk]["Name"].values for rk in run_keys)
-        ]
-        if not ops_in_runs:
+        ops_in_run = [op for op in OP_ORDER if op in hdf["Name"].values]
+        if not ops_in_run:
             continue
 
         ncols = 3
-        nrows = -(-len(ops_in_runs) // ncols)
+        nrows = -(-len(ops_in_run) // ncols)
         fig, axes = plt.subplots(nrows, ncols, figsize=(6 * ncols, 3.5 * nrows))
         axes_flat = axes.flatten() if hasattr(axes, "flatten") else [axes]
         fig.suptitle(
-            f"Failure Rate Over Time by Operation ({users} Users)",
+            f"{lbl}: Failure Rate Over Time ({users} Users)",
             fontsize=13, fontweight="bold",
         )
 
-        for i, op in enumerate(ops_in_runs):
+        for i, op in enumerate(ops_in_run):
             ax = axes_flat[i]
-            for j, run_key in enumerate(sorted(run_keys)):
-                m = re.match(r"(.+)_(direct|http)_(\d+)u$", run_key)
-                lbl = run_label(labels, m.group(1), m.group(2)) if m else run_key
-                odf = history[run_key][history[run_key]["Name"] == op].copy()
-                if odf.empty:
-                    continue
-                odf["failure_pct"] = (
-                    odf["Failures/s"] / odf["Requests/s"].replace(0, float("nan")) * 100
-                ).fillna(0)
-                col = colors[j % len(colors)]
-                ax.plot(odf["elapsed_s"], odf["failure_pct"], linewidth=2,
-                        color=col, label=lbl)
+            odf = hdf[hdf["Name"] == op].copy()
+            odf["failure_pct"] = (
+                odf["Failures/s"] / odf["Requests/s"].replace(0, float("nan")) * 100
+            ).fillna(0)
+            ax.plot(odf["elapsed_s"], odf["failure_pct"], linewidth=2, color="#F44336")
             ax.set_title(op.replace("_", " ").title(), fontsize=10)
             ax.set_xlabel("elapsed (s)", fontsize=9)
             ax.set_ylabel("failure rate (%)", fontsize=9)
-            ax.legend(fontsize=7)
             ax.grid(True)
             ax.set_ylim(bottom=0, top=100)
 
-        for j in range(len(ops_in_runs), len(axes_flat)):
+        for j in range(len(ops_in_run), len(axes_flat)):
             axes_flat[j].set_visible(False)
 
         fig.tight_layout()
-        save(fig, out / f"{users}u.png", show)
+        save(fig, out / f"{run_key}.png", show)
 
 
 def fig_user_count_combined(
@@ -600,61 +579,30 @@ def fig_cold_start(show: bool) -> None:
     if not csv_path.exists():
         return
     out = subdir("cold_start")
-    df = pd.read_csv(csv_path).dropna(subset=["cold_ms", "delta_ms"])
+    df = pd.read_csv(csv_path).dropna(subset=["cold_ms"])
     if df.empty:
         return
 
-    x = [str(s) for s in df["sample"]]
-    avg_warm = df["warm_avg_ms"].mean()
-    avg_cold = df["cold_ms"].mean()
-    avg_delta = df["delta_ms"].mean()
+    if "service" not in df.columns:
+        df["service"] = "postgres"
 
-    fig, (ax_lat, ax_delta) = plt.subplots(1, 2, figsize=(11, 4))
-    fig.suptitle("Cold Start Latency", fontsize=13, fontweight="bold")
+    agg = df.groupby("service")["cold_ms"].mean().reset_index()
+    colors = ["#4C72B0", "#DD8452", "#55A868", "#C44E52", "#8172B2", "#937860"]
 
-    width = 0.35
-    xi = range(len(x))
-    bars_warm = ax_lat.bar(
-        [i - width / 2 for i in xi], df["warm_avg_ms"], width=width,
-        color="#2196F3", label="warm avg",
-    )
-    bars_cold = ax_lat.bar(
-        [i + width / 2 for i in xi], df["cold_ms"], width=width,
-        color="#F44336", label="cold",
-    )
-    for bar, val in list(zip(bars_warm, df["warm_avg_ms"])) + list(zip(bars_cold, df["cold_ms"])):
-        ax_lat.text(
+    fig, ax = plt.subplots(figsize=(max(5, len(agg) * 1.5), 4))
+    fig.suptitle("Cold Start Latency by Service", fontsize=13, fontweight="bold")
+
+    bars = ax.bar(agg["service"], agg["cold_ms"], color=colors[:len(agg)], width=0.5)
+    for bar, val in zip(bars, agg["cold_ms"]):
+        ax.text(
             bar.get_x() + bar.get_width() / 2, bar.get_height() + 10,
-            f"{val:.0f}", ha="center", va="bottom", fontsize=8,
+            f"{val:.0f} ms", ha="center", va="bottom", fontsize=9,
         )
-    ax_lat.axhline(avg_warm, color="#2196F3", linewidth=1, linestyle="--")
-    ax_lat.axhline(avg_cold, color="#F44336", linewidth=1, linestyle="--")
-    ax_lat.set_xticks(list(xi))
-    ax_lat.set_xticklabels(x, fontsize=9)
-    ax_lat.set_xlabel("sample", fontsize=11)
-    ax_lat.set_ylabel("latency (ms)", fontsize=11)
-    ax_lat.set_title("Warm vs Cold Latency")
-    ax_lat.legend(fontsize=9)
-    ax_lat.set_axisbelow(True)
-    ax_lat.grid(True, axis="y")
-    ax_lat.set_ylim(bottom=0)
 
-    bars_delta = ax_delta.bar(x, df["delta_ms"], color="#FF9800", width=0.5)
-    for bar, val in zip(bars_delta, df["delta_ms"]):
-        ax_delta.text(
-            bar.get_x() + bar.get_width() / 2, bar.get_height() + 10,
-            f"{val:.0f}", ha="center", va="bottom", fontsize=8,
-        )
-    ax_delta.axhline(avg_delta, color="#FF9800", linewidth=1, linestyle="--",
-                     label=f"avg {avg_delta:.0f} ms")
-    ax_delta.set_xlabel("sample", fontsize=11)
-    ax_delta.set_ylabel("delta (ms)", fontsize=11)
-    ax_delta.set_title("Cold - Warm Delta")
-    ax_delta.legend(fontsize=9)
-    ax_delta.set_axisbelow(True)
-    ax_delta.grid(True, axis="y")
-    ax_delta.set_ylim(bottom=0)
-
+    ax.set_ylabel("avg cold start (ms)", fontsize=11)
+    ax.set_axisbelow(True)
+    ax.grid(True, axis="y")
+    ax.set_ylim(bottom=0)
     fig.tight_layout()
     save(fig, out / "cold_start.png", show)
 

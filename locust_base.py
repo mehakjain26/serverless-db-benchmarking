@@ -1,4 +1,5 @@
 import json
+import os
 import time
 from pathlib import Path
 
@@ -39,14 +40,25 @@ class BenchmarkTasks:
     def t_bulk_update(self):
         self.run_op(RequestType.BULK_UPDATE_DEPARTURES)
 
-    # Pre-expanded so UserMeta applies weights correctly
-    tasks = (
-        [t_point_read] * G.TASK_WEIGHTS["point_read"]
-        + [t_next_departures] * G.TASK_WEIGHTS["next_departures"]
-        + [t_large_scan] * G.TASK_WEIGHTS["large_scan"]
-        + [t_trips_per_route] * G.TASK_WEIGHTS["trips_per_route"]
-        + [t_bulk_update] * G.TASK_WEIGHTS["bulk_update_departures"]
-    )
+    _OP_TASKS = {
+        "point_read": t_point_read,
+        "next_departures": t_next_departures,
+        "large_scan": t_large_scan,
+        "trips_per_route": t_trips_per_route,
+        "bulk_update_departures": t_bulk_update,
+    }
+
+    _bench_op = os.environ.get("BENCH_OP")
+    if _bench_op and _bench_op in _OP_TASKS:
+        tasks = [_OP_TASKS[_bench_op]]
+    else:
+        tasks = (
+            [t_point_read] * G.TASK_WEIGHTS["point_read"]
+            + [t_next_departures] * G.TASK_WEIGHTS["next_departures"]
+            + [t_large_scan] * G.TASK_WEIGHTS["large_scan"]
+            + [t_trips_per_route] * G.TASK_WEIGHTS["trips_per_route"]
+            + [t_bulk_update] * G.TASK_WEIGHTS["bulk_update_departures"]
+        )
 
 
 class BenchmarkUser(BenchmarkTasks, User):
