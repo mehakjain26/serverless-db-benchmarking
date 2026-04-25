@@ -15,7 +15,18 @@ RESULTS = ROOT / G.RESULTS_DIR
 
 FUNCTION_URLS = {
     "sql": G.FUNCTION_URL_POSTGRES,
+    "neon": G.FUNCTION_URL_POSTGRES,
+    "cloudant": G.FUNCTION_URL_CLOUDANT,
+    "mongo": "",
 }
+
+# Adapters that reuse another adapter's locustfile with an env override
+ADAPTER_ALIASES = {
+    "neon": ("sql", {"BENCH_DB": "neon"}),
+}
+
+
+OP_CHOICES = ["point_read", "next_departures", "large_scan", "trips_per_route", "bulk_update_departures"]
 
 
 def parse_args():
@@ -25,6 +36,8 @@ def parse_args():
     p.add_argument("--users", nargs="+", type=int, default=G.CONCURRENCY_LEVELS, metavar="N")
     p.add_argument("--spawn", type=int, default=G.SPAWN_RATE)
     p.add_argument("--time", default=G.RUN_TIME)
+    p.add_argument("--op", choices=OP_CHOICES, default=None, metavar="OP",
+                   help="run only this operation type")
     p.add_argument("--label", default="", help="human-readable name for this run (used in plot titles)")
     for name in FUNCTION_URLS:
         p.add_argument(f"--url-{name}", default=None, metavar="URL")
@@ -35,7 +48,7 @@ def resolve_url(adapter: str, args) -> str:
     return getattr(args, f"url_{adapter}", None) or FUNCTION_URLS.get(adapter, "")
 
 
-def run_locust(adapter, locustfile, host, users, spawn, run_time, label):
+def run_locust(adapter, locustfile, host, users, spawn, run_time, label, extra_env=None):
     csv_path = str(RESULTS / label)
     html_path = str(RESULTS / f"{label}.html")
 
@@ -48,6 +61,7 @@ def run_locust(adapter, locustfile, host, users, spawn, run_time, label):
         "--run-time", run_time,
         "--headless",
         "--csv", csv_path,
+        "--csv-full-history",
         "--html", html_path,
     ]
 
@@ -57,7 +71,7 @@ def run_locust(adapter, locustfile, host, users, spawn, run_time, label):
     rich.print(f"  output: {csv_path}_stats.csv")
     rich.print(f"[bold]{'=' * 60}[/bold]")
 
-    env = {**os.environ, "PYTHONPATH": str(ROOT)}
+    env = {**os.environ, "PYTHONPATH": str(ROOT), **(extra_env or {})}
     result = subprocess.run(cmd, cwd=locustfile.parent, env=env)
     if result.returncode != 0:
         rich.print(f"  [yellow]WARNING: locust exited {result.returncode}[/yellow]", file=sys.stderr)
@@ -68,17 +82,18 @@ def main():
     RESULTS.mkdir(parents=True, exist_ok=True)
 
     for adapter in args.adapters:
-        adapter_dir = ROOT / adapter
+        alias_source, alias_env = ADAPTER_ALIASES.get(adapter, (adapter, {}))
+        adapter_dir = ROOT / alias_source
 
         if not adapter_dir.is_dir():
             rich.print(f"[yellow]Skipping {adapter}: {adapter_dir} not found[/yellow]")
             continue
 
         if args.mode == "direct":
-            locustfile = adapter_dir / f"locustfile_{adapter}.py"
+            locustfile = adapter_dir / f"locustfile_{alias_source}.py"
             host = f"direct-{adapter}"
         else:
-            locustfile = adapter_dir / "locustfile_http.py"
+            locustfile = ROOT / "locust_base.py"
             host = resolve_url(adapter, args)
             if not host:
                 rich.print(f"[yellow]Skipping {adapter} (http): no URL. Pass --url-{adapter}[/yellow]")
@@ -99,6 +114,7 @@ def main():
             if i > 0 and G.COOLDOWN_SECS > 0:
                 rich.print(f"\n[dim]Cooling down {G.COOLDOWN_SECS}s...[/dim]")
                 time.sleep(G.COOLDOWN_SECS)
+            op_env = {"BENCH_OP": args.op} if args.op else {}
             run_locust(
                 adapter=adapter,
                 locustfile=locustfile,
@@ -107,6 +123,7 @@ def main():
                 spawn=args.spawn,
                 run_time=args.time,
                 label=f"{run_stem}_{users}u",
+                extra_env={**alias_env, **op_env},
             )
 
     rich.print(f"\n[green]All runs complete.[/green] Results in [bold]{RESULTS}/[/bold]")

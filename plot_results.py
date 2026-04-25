@@ -50,6 +50,10 @@ def load_stats() -> pd.DataFrame:
                     "failures": row["Failure Count"],
                     "requests": row["Request Count"],
                     "avg_ms": row["Average Response Time"],
+                    "success_rps": row["Requests/s"] * (
+                        1 - row["Failure Count"] / row["Request Count"]
+                        if row["Request Count"] > 0 else 0
+                    ),
                 }
             )
     return pd.DataFrame(rows)
@@ -71,8 +75,12 @@ def load_history() -> "dict[str, pd.DataFrame]":
         if not m:
             continue
         df = pd.read_csv(path)
-        df = df[df["Name"] == "Aggregated"].copy()
-        df["elapsed_s"] = df["Timestamp"] - df["Timestamp"].iloc[0]
+        t0 = df["Timestamp"].min()
+        df["elapsed_s"] = df["Timestamp"] - t0
+        pct_cols = ["50%", "66%", "75%", "80%", "90%", "95%", "98%", "99%"]
+        for col in pct_cols:
+            if col in df.columns:
+                df[col] = df[col].replace(0, float("nan")).ffill()
         result[m.group(1)] = df
     return result
 
@@ -86,8 +94,6 @@ def subdir(name: str) -> Path:
 def save(fig: Figure, path: Path, show: bool) -> None:
     fig.savefig(path, dpi=150, bbox_inches="tight")
     rich.print(f"  saved [cyan]{path}[/cyan]")
-    if show:
-        plt.show()
     plt.close(fig)
 
 
@@ -238,7 +244,7 @@ def fig_latency_bars(df: pd.DataFrame, labels: dict, show: bool) -> None:
 
 def fig_throughput(df: pd.DataFrame, labels: dict, show: bool) -> None:
     out = subdir("throughput")
-    agg = df.groupby(["adapter", "mode", "users"])["rps"].mean().reset_index()
+    agg = df.groupby(["adapter", "mode", "users"])[["rps", "success_rps"]].mean().reset_index()
 
     for (adapter, mode), mdf in agg.groupby(["adapter", "mode"]):
         lbl = run_label(labels, adapter, mode)
@@ -248,24 +254,70 @@ def fig_throughput(df: pd.DataFrame, labels: dict, show: bool) -> None:
         )
 
         mdf = mdf.sort_values("users")
-        bars = ax.bar(
-            [str(u) for u in mdf["users"]], mdf["rps"], color="#4C72B0", width=0.5
+        x = [str(u) for u in mdf["users"]]
+        bar_w = 0.35
+        xi = range(len(x))
+        bars_total = ax.bar(
+            [i - bar_w / 2 for i in xi], mdf["rps"], width=bar_w,
+            color="#4C72B0", label="total",
         )
-        for bar, val in zip(bars, mdf["rps"]):
+        bars_ok = ax.bar(
+            [i + bar_w / 2 for i in xi], mdf["success_rps"], width=bar_w,
+            color="#55A868", label="successful",
+        )
+        for bar, val in list(zip(bars_total, mdf["rps"])) + list(zip(bars_ok, mdf["success_rps"])):
             ax.text(
                 bar.get_x() + bar.get_width() / 2,
                 bar.get_height() + 0.2,
                 f"{val:.1f}",
-                ha="center",
-                va="bottom",
-                fontsize=9,
+                ha="center", va="bottom", fontsize=8,
             )
-
+        ax.set_xticks(list(xi))
+        ax.set_xticklabels(x, fontsize=9)
+        ax.legend(fontsize=9)
         ax.set_xlabel("concurrent users", fontsize=11)
         ax.set_ylabel("avg requests / second per operation", fontsize=11)
         ax.set_axisbelow(True)
         ax.grid(True, axis="y")
         ax.set_ylim(bottom=0)
+        fig.tight_layout()
+        save(fig, out / f"{adapter}_{mode}.png", show)
+
+
+def fig_failures(df: pd.DataFrame, labels: dict, show: bool) -> None:
+    out = subdir("failures")
+    colors = ["#4C72B0", "#DD8452", "#55A868", "#C44E52", "#8172B2"]
+
+    for (adapter, mode), mdf in df.groupby(["adapter", "mode"]):
+        lbl = run_label(labels, adapter, mode)
+        users_sorted = sorted(mdf["users"].unique())
+        x = [str(u) for u in users_sorted]
+        ops = ops_present(mdf)
+
+        fig, (ax_count, ax_pct) = plt.subplots(1, 2, figsize=(11, 4))
+        fig.suptitle(f"{lbl}: Failures vs Concurrency", fontsize=13, fontweight="bold")
+
+        for i, op in enumerate(ops):
+            odf = mdf[mdf["op"] == op].sort_values("users")
+            counts = [odf[odf["users"] == u]["failures"].values[0] if u in odf["users"].values else 0 for u in users_sorted]
+            reqs = [odf[odf["users"] == u]["requests"].values[0] if u in odf["users"].values else 1 for u in users_sorted]
+            pcts = [c / r * 100 if r > 0 else 0 for c, r in zip(counts, reqs)]
+            col = colors[i % len(colors)]
+            label = op.replace("_", " ")
+            ax_count.plot(x, counts, marker="o", linewidth=2, color=col, label=label)
+            ax_pct.plot(x, pcts, marker="o", linewidth=2, color=col, label=label)
+
+        for ax, ylabel, title in [
+            (ax_count, "total failures", "Failure Count"),
+            (ax_pct, "failure rate (%)", "Failure Rate"),
+        ]:
+            ax.set_xlabel("concurrent users", fontsize=11)
+            ax.set_ylabel(ylabel, fontsize=11)
+            ax.set_title(title)
+            ax.legend(fontsize=8)
+            ax.grid(True)
+            ax.set_ylim(bottom=0)
+
         fig.tight_layout()
         save(fig, out / f"{adapter}_{mode}.png", show)
 
@@ -276,7 +328,8 @@ def fig_latency_over_time(
     if not history:
         return
     out = subdir("latency_over_time")
-    for run_key, hdf in sorted(history.items()):
+    for run_key, hdf_full in sorted(history.items()):
+        hdf = hdf_full[hdf_full["Name"] == "Aggregated"]
         m = re.match(r"(.+)_(direct|http)_(\d+)u$", run_key)
         lbl = run_label(labels, m.group(1), m.group(2)) if m else run_key
         users_str = f"{m.group(3)} Users" if m else run_key
@@ -326,7 +379,8 @@ def fig_user_count(
     if not history:
         return
     out = subdir("latency_over_time")
-    for run_key, hdf in sorted(history.items()):
+    for run_key, hdf_full in sorted(history.items()):
+        hdf = hdf_full[hdf_full["Name"] == "Aggregated"]
         m = re.match(r"(.+)_(direct|http)_(\d+)u$", run_key)
         lbl = run_label(labels, m.group(1), m.group(2)) if m else run_key
         users_str = f"{m.group(3)} Users" if m else run_key
@@ -343,6 +397,214 @@ def fig_user_count(
         ax.set_ylim(bottom=0)
         fig.tight_layout()
         save(fig, out / f"{run_key}_users.png", show)
+
+
+def fig_latency_per_op(
+    history: "dict[str, pd.DataFrame]", labels: dict, show: bool
+) -> None:
+    """One image per (service, user count), 5 subplots (one per op), p50+p95 lines."""
+    if not history:
+        return
+    out = subdir("latency_per_op")
+
+    for run_key, hdf in sorted(history.items()):
+        m = re.match(r"(.+)_(direct|http)_(\d+)u$", run_key)
+        if not m:
+            continue
+        lbl = run_label(labels, m.group(1), m.group(2))
+        users = m.group(3)
+
+        ops_in_run = [op for op in OP_ORDER if op in hdf["Name"].values]
+        if not ops_in_run:
+            continue
+
+        ncols = 3
+        nrows = -(-len(ops_in_run) // ncols)
+        fig, axes = plt.subplots(nrows, ncols, figsize=(6 * ncols, 3.5 * nrows))
+        axes_flat = axes.flatten() if hasattr(axes, "flatten") else [axes]
+        fig.suptitle(
+            f"{lbl}: Latency Over Time ({users} Users)",
+            fontsize=13, fontweight="bold",
+        )
+
+        for i, op in enumerate(ops_in_run):
+            ax = axes_flat[i]
+            odf = hdf[hdf["Name"] == op]
+            ax.plot(odf["elapsed_s"], odf["50%"], linewidth=2,
+                    color=PCTILE_COLORS["p50"])
+            ax.set_title(op.replace("_", " ").title(), fontsize=10)
+            ax.set_xlabel("elapsed (s)", fontsize=9)
+            ax.set_ylabel("p50 latency (ms)", fontsize=9)
+            ax.grid(True)
+            ax.set_ylim(bottom=0)
+
+        for j in range(len(ops_in_run), len(axes_flat)):
+            axes_flat[j].set_visible(False)
+
+        fig.tight_layout()
+        save(fig, out / f"{run_key}.png", show)
+
+
+def fig_failures_per_op(
+    history: "dict[str, pd.DataFrame]", labels: dict, show: bool
+) -> None:
+    """One image per (service, user count), 5 subplots (one per op), failure rate line."""
+    if not history:
+        return
+    out = subdir("failures_per_op")
+
+    for run_key, hdf in sorted(history.items()):
+        m = re.match(r"(.+)_(direct|http)_(\d+)u$", run_key)
+        if not m:
+            continue
+        lbl = run_label(labels, m.group(1), m.group(2))
+        users = m.group(3)
+
+        ops_in_run = [op for op in OP_ORDER if op in hdf["Name"].values]
+        if not ops_in_run:
+            continue
+
+        ncols = 3
+        nrows = -(-len(ops_in_run) // ncols)
+        fig, axes = plt.subplots(nrows, ncols, figsize=(6 * ncols, 3.5 * nrows))
+        axes_flat = axes.flatten() if hasattr(axes, "flatten") else [axes]
+        fig.suptitle(
+            f"{lbl}: Failure Rate Over Time ({users} Users)",
+            fontsize=13, fontweight="bold",
+        )
+
+        for i, op in enumerate(ops_in_run):
+            ax = axes_flat[i]
+            odf = hdf[hdf["Name"] == op].copy()
+            odf["failure_pct"] = (
+                odf["Failures/s"] / odf["Requests/s"].replace(0, float("nan")) * 100
+            ).fillna(0)
+            ax.plot(odf["elapsed_s"], odf["failure_pct"], linewidth=2, color="#F44336")
+            ax.set_title(op.replace("_", " ").title(), fontsize=10)
+            ax.set_xlabel("elapsed (s)", fontsize=9)
+            ax.set_ylabel("failure rate (%)", fontsize=9)
+            ax.grid(True)
+            ax.set_ylim(bottom=0, top=100)
+
+        for j in range(len(ops_in_run), len(axes_flat)):
+            axes_flat[j].set_visible(False)
+
+        fig.tight_layout()
+        save(fig, out / f"{run_key}.png", show)
+
+
+def fig_user_count_combined(
+    history: "dict[str, pd.DataFrame]", labels: dict, show: bool
+) -> None:
+    if not history:
+        return
+    out = subdir("latency_over_time")
+    run_keys = sorted(history.keys())
+    ncols = min(3, len(run_keys))
+    nrows = -(-len(run_keys) // ncols)
+
+    fig, axes = plt.subplots(nrows, ncols, figsize=(5 * ncols, 3.5 * nrows))
+    axes_flat = axes.flatten() if hasattr(axes, "flatten") else [axes]
+    fig.suptitle("User Count Over Time", fontsize=13, fontweight="bold")
+
+    for i, run_key in enumerate(run_keys):
+        hdf = history[run_key][history[run_key]["Name"] == "Aggregated"]
+        m = re.match(r"(.+)_(direct|http)_(\d+)u$", run_key)
+        lbl = run_label(labels, m.group(1), m.group(2)) if m else run_key
+        users_str = f"{m.group(3)} Users" if m else run_key
+        ax = axes_flat[i]
+        ax.plot(hdf["elapsed_s"], hdf["User Count"], linewidth=2, color="#8172B2")
+        ax.set_title(f"{lbl} ({users_str})", fontsize=9)
+        ax.set_xlabel("elapsed (s)", fontsize=9)
+        ax.set_ylabel("users", fontsize=9)
+        ax.grid(True)
+        ax.set_ylim(bottom=0)
+
+    for j in range(len(run_keys), len(axes_flat)):
+        axes_flat[j].set_visible(False)
+
+    fig.tight_layout()
+    save(fig, out / "user_count_combined.png", show)
+
+
+def fig_latency_over_time_per_op(
+    history: "dict[str, pd.DataFrame]", labels: dict, show: bool
+) -> None:
+    if not history:
+        return
+    out = subdir("latency_over_time")
+    ops = OP_ORDER
+
+    for run_key, hdf_full in sorted(history.items()):
+        m = re.match(r"(.+)_(direct|http)_(\d+)u$", run_key)
+        lbl = run_label(labels, m.group(1), m.group(2)) if m else run_key
+        users_str = f"{m.group(3)} Users" if m else run_key
+
+        ops_in_run = [op for op in ops if op in hdf_full["Name"].values]
+        if not ops_in_run:
+            continue
+
+        ncols = 3
+        nrows = -(-len(ops_in_run) // ncols)
+        fig, axes = plt.subplots(nrows, ncols, figsize=(6 * ncols, 3.5 * nrows))
+        axes_flat = axes.flatten() if hasattr(axes, "flatten") else [axes]
+        fig.suptitle(
+            f"{lbl}: Latency Over Time by Operation ({users_str})",
+            fontsize=13, fontweight="bold",
+        )
+
+        for i, op in enumerate(ops_in_run):
+            odf = hdf_full[hdf_full["Name"] == op]
+            ax = axes_flat[i]
+            ax.plot(odf["elapsed_s"], odf["50%"], label="p50", linewidth=2,
+                    color=PCTILE_COLORS["p50"])
+            ax.plot(odf["elapsed_s"], odf["95%"], label="p95", linewidth=2,
+                    color=PCTILE_COLORS["p95"])
+            ax.set_title(op.replace("_", " ").title(), fontsize=10)
+            ax.set_xlabel("elapsed (s)", fontsize=9)
+            ax.set_ylabel("latency (ms)", fontsize=9)
+            ax.legend(fontsize=8)
+            ax.grid(True)
+            ax.set_ylim(bottom=0)
+
+        for j in range(len(ops_in_run), len(axes_flat)):
+            axes_flat[j].set_visible(False)
+
+        fig.tight_layout()
+        save(fig, out / f"{run_key}_per_op.png", show)
+
+
+def fig_cold_start(show: bool) -> None:
+    csv_path = RESULTS_DIR / "cold_start.csv"
+    if not csv_path.exists():
+        return
+    out = subdir("cold_start")
+    df = pd.read_csv(csv_path).dropna(subset=["cold_ms"])
+    if df.empty:
+        return
+
+    if "service" not in df.columns:
+        df["service"] = "postgres"
+
+    agg = df.groupby("service")["cold_ms"].mean().reset_index()
+    colors = ["#4C72B0", "#DD8452", "#55A868", "#C44E52", "#8172B2", "#937860"]
+
+    fig, ax = plt.subplots(figsize=(max(5, len(agg) * 1.5), 4))
+    fig.suptitle("Cold Start Latency by Service", fontsize=13, fontweight="bold")
+
+    bars = ax.bar(agg["service"], agg["cold_ms"], color=colors[:len(agg)], width=0.5)
+    for bar, val in zip(bars, agg["cold_ms"]):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2, bar.get_height() + 10,
+            f"{val:.0f} ms", ha="center", va="bottom", fontsize=9,
+        )
+
+    ax.set_ylabel("avg cold start (ms)", fontsize=11)
+    ax.set_axisbelow(True)
+    ax.grid(True, axis="y")
+    ax.set_ylim(bottom=0)
+    fig.tight_layout()
+    save(fig, out / "cold_start.png", show)
 
 
 def fig_mode_comparison(df: pd.DataFrame, labels: dict, show: bool) -> None:
@@ -447,13 +709,23 @@ def main():
         rich.print(f"  {lbl}  ({r['users']} users)")
     rich.print()
 
-    fig_latency_vs_concurrency(df, labels, show)
-    fig_latency_avg(df, labels, show)
-    fig_latency_bars(df, labels, show)
-    fig_throughput(df, labels, show)
-    fig_latency_over_time(history, labels, show)
-    fig_user_count(history, labels, show)
-    fig_mode_comparison(df, labels, show)
+    for fn in [
+        lambda: fig_latency_vs_concurrency(df, labels, show),
+        lambda: fig_latency_avg(df, labels, show),
+        lambda: fig_latency_bars(df, labels, show),
+        lambda: fig_cold_start(show),
+        lambda: fig_latency_per_op(history, labels, show),
+        lambda: fig_failures_per_op(history, labels, show),
+        lambda: fig_throughput(df, labels, show),
+        lambda: fig_failures(df, labels, show),
+        lambda: fig_latency_over_time(history, labels, show),
+        lambda: fig_user_count_combined(history, labels, show),
+        lambda: fig_mode_comparison(df, labels, show),
+    ]:
+        try:
+            fn()
+        except Exception as e:
+            rich.print(f"  [yellow]warning: chart skipped — {e}[/yellow]")
 
     rich.print(f"\n[green]Done.[/green] Figures in [bold]{FIGURES_DIR}/[/bold]")
 

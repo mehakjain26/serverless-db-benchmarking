@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 
+import argparse
 import csv
 import io
+import logging
 import os
 import sys
 import zipfile
-import psycopg2
-import logging
 
-sys.path.insert(0, "..")
-import globals as G  # noqa: E402
+import psycopg2
+
+from server import db_config as SG
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger()
@@ -78,16 +79,16 @@ def copy(cur, table, path, cols, transform):
     log.info(f"{table}: {count} rows")
 
 # ================= MAIN =================
-def ingest(zip_file, city, transport_id):
+def ingest(zip_file, city, transport_id, db="postgres"):
 
-    log.info(f"Starting {city}")
+    log.info(f"Starting {city} -> {db}")
 
     tmp = "/tmp/gtfs"
     os.makedirs(tmp, exist_ok=True)
 
     files = extract(zip_file, tmp)
 
-    conn = psycopg2.connect(**G.POSTGRES)
+    conn = psycopg2.connect(**SG.get_postgres(db))
 
     with conn:
         with conn.cursor() as cur:
@@ -185,8 +186,11 @@ def ingest(zip_file, city, transport_id):
 
 # ================= RUN =================
 if __name__ == "__main__":
-    zip_file = sys.argv[1]
-    city = sys.argv[2]
-    transport_id = int(sys.argv[3])
+    p = argparse.ArgumentParser()
+    p.add_argument("zip_file")
+    p.add_argument("city")
+    p.add_argument("transport_id", type=int)
+    p.add_argument("--db", default="postgres", choices=list(SG.POSTGRES_DBS))
+    args = p.parse_args()
 
-    ingest(zip_file, city, transport_id)
+    ingest(args.zip_file, args.city, args.transport_id, db=args.db)

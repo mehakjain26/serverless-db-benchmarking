@@ -28,3 +28,5 @@ scripts/test.py
 # OS
 .DS_Store
 Thumbs.db
+data/*
+__pycache__

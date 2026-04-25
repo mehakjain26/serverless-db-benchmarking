@@ -17,23 +17,23 @@ RESULTS_DIR = Path(G.RESULTS_DIR)
 OUTPUT_CSV = RESULTS_DIR / "cold_start.csv"
 
 
-def probe(catalog: dict) -> float:
+def probe(url: str, catalog: dict) -> float:
     params = {
         "op": "point_read",
         "transport_id": catalog["transport_id"],
         "stop_id": catalog["stop_id"],
     }
     t0 = time.perf_counter()
-    r = requests.get(G.FUNCTION_URL_POSTGRES, params=params, timeout=60)
+    r = requests.get(url, params=params, timeout=60)
     r.raise_for_status()
     return (time.perf_counter() - t0) * 1000
 
 
-def warm_baseline(catalog: dict, reps: int) -> float:
+def warm_baseline(url: str, catalog: dict, reps: int) -> float:
     times = []
     for _ in range(reps):
         try:
-            times.append(probe(catalog))
+            times.append(probe(url, catalog))
         except Exception as e:
             rich.print(f"    [yellow]warm probe error: {e}[/yellow]")
     return sum(times) / len(times) if times else float("nan")
@@ -46,6 +46,8 @@ def load_catalog() -> list[dict]:
 
 def parse_args():
     p = argparse.ArgumentParser()
+    p.add_argument("--service", required=True, help="label for this service (e.g. postgres, neon, gcf)")
+    p.add_argument("--url", default=None, help="endpoint URL (defaults to FUNCTION_URL_POSTGRES)")
     p.add_argument("--samples", type=int, default=G.COLD_START_SAMPLES)
     p.add_argument("--idle", type=int, default=G.COLD_START_IDLE_SECS)
     p.add_argument("--warm-reps", type=int, default=G.COLD_START_WARM_REPS)
@@ -54,15 +56,16 @@ def parse_args():
 
 def main():
     args = parse_args()
+    url = args.url or G.FUNCTION_URL_POSTGRES
 
-    if not G.FUNCTION_URL_POSTGRES:
-        rich.print("[red]G.FUNCTION_URL_POSTGRES not set in globals.py[/red]")
+    if not url:
+        rich.print("[red]No URL: pass --url or set FUNCTION_URL_POSTGRES in globals.py[/red]")
         sys.exit(1)
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    rich.print("\n[bold]Cold start measurement[/bold]")
-    rich.print(f"  url      = [cyan]{G.FUNCTION_URL_POSTGRES}[/cyan]")
+    rich.print(f"\n[bold]Cold start measurement: {args.service}[/bold]")
+    rich.print(f"  url      = [cyan]{url}[/cyan]")
     rich.print(f"  samples  = {args.samples}")
     rich.print(f"  idle     = {args.idle}s")
     rich.print(f"  warm_reps= {args.warm_reps}\n")
@@ -75,8 +78,8 @@ def main():
     for sample_num in range(1, args.samples + 1):
         rich.print(Rule(f"Sample {sample_num}/{args.samples}"))
 
-        rich.print(f"  Warming Lambda ({args.warm_reps} reps)...", end=" ")
-        warm_avg = warm_baseline(catalog, args.warm_reps)
+        rich.print(f"  Warming ({args.warm_reps} reps)...", end=" ")
+        warm_avg = warm_baseline(url, catalog, args.warm_reps)
         rich.print(f"[green]{warm_avg:.1f} ms[/green] avg")
 
         rich.print(f"\n  [dim]Idling {args.idle}s...[/dim]", end="", flush=True)
@@ -85,7 +88,7 @@ def main():
 
         rich.print("  Cold probe...", end=" ")
         try:
-            cold_ms = probe(catalog)
+            cold_ms = probe(url, catalog)
             delta = cold_ms - warm_avg
             color = "red" if delta > 1000 else "yellow" if delta > 200 else "green"
             rich.print(f"[{color}]{cold_ms:.1f} ms[/{color}]  (delta=[{color}]{delta:+.1f} ms[/{color}])")
@@ -95,16 +98,19 @@ def main():
             rich.print(f"[red]ERROR: {e}[/red]")
 
         rows.append({
+            "service": args.service,
             "sample": sample_num,
             "warm_avg_ms": round(warm_avg, 3),
             "cold_ms": round(cold_ms, 3),
             "delta_ms": round(delta, 3),
         })
 
-    fieldnames = ["sample", "warm_avg_ms", "cold_ms", "delta_ms"]
-    with open(OUTPUT_CSV, "w", newline="") as f:
+    fieldnames = ["service", "sample", "warm_avg_ms", "cold_ms", "delta_ms"]
+    write_header = not OUTPUT_CSV.exists()
+    with open(OUTPUT_CSV, "a", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
+        if write_header:
+            writer.writeheader()
         writer.writerows(rows)
 
     t = Table(title="Cold Start Summary", show_lines=True)
