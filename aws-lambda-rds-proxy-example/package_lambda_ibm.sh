@@ -17,10 +17,37 @@ pip3 install \
     --only-binary=:all: \
     --upgrade \
     psycopg2-binary
+pip3 install \
+    --platform manylinux2014_x86_64 \
+    --target=package_ibm \
+    --implementation cp \
+    --python-version 3.12 \
+    --only-binary=:all: \
+    --upgrade \
+    numpy
+pip3 install \
+    --platform manylinux2014_x86_64 \
+    --target=package_ibm \
+    --implementation cp \
+    --python-version 3.12 \
+    --only-binary=:all: \
+    --upgrade \
+    rich markdown-it-py pygments mdurl
+pip3 install \
+    --platform manylinux2014_x86_64 \
+    --target=package_ibm \
+    --implementation cp \
+    --python-version 3.12 \
+    --only-binary=:all: \
+    --upgrade \
+    boto3
 
 # Copy the lambda code and certificate
 cp lambda_function_ibm.py package_ibm/
 cp scripts_ibm/ibm_postgres_ca.crt package_ibm/
+cp ../req_gen.py package_ibm/
+cp ../globals.py package_ibm/
+cp -r ../server package_ibm/
 
 # Zip everything inside the package folder
 cd package_ibm

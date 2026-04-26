@@ -100,6 +100,11 @@ resource "aws_rds_cluster" "aurora" {
   iam_database_authentication_enabled = true
   skip_final_snapshot = true
 
+  serverlessv2_scaling_configuration {
+    max_capacity = 4.0
+    min_capacity = 0
+  }
+
   lifecycle {
     ignore_changes = [master_password, availability_zones]
   }

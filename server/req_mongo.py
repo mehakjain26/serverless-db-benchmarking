@@ -17,35 +17,38 @@ def get_col(client: MongoClient):
 
 
 def point_read(col, params: dict) -> list:
+    tid = int(params["transport_id"])
+    sid = str(params["stop_id"])
     d = col.find_one(
-        {"type": "stops", "transport_id": params["transport_id"], "stop_id": params["stop_id"]},
+        {"type": "stops", "transport_id": tid, "stop_id": sid},
         {"_id": 0, "stop_name": 1, "stop_lat": 1, "stop_lon": 1},
     )
     return [d] if d else []
 
 
 def large_scan(col, params: dict) -> list:
-    # Sort by departure_time mirrors SQL ORDER BY departure_time. No index on
-    # departure_time alone so MongoDB does a collection scan + sort — same I/O
-    # stress as the SQL large_scan.
+    tid = int(params["transport_id"])
+    limit = int(params.get("limit", 100))
     return list(
         col.find(
-            {"type": "stop_times", "transport_id": params["transport_id"]},
+            {"type": "stop_times", "transport_id": tid},
             {"_id": 0, "trip_id": 1, "stop_id": 1, "departure_time": 1, "arrival_time": 1},
         )
         .sort("departure_time", ASCENDING)
-        .limit(params["limit"])
+        .limit(limit)
     )
 
 
 def next_departures(col, params: dict) -> list:
-    after = params["after"]
+    tid = int(params["transport_id"])
+    sid = str(params["stop_id"])
+    after = int(params["after"])
     stop_times = list(
         col.find(
             {
                 "type": "stop_times",
-                "transport_id": params["transport_id"],
-                "stop_id": params["stop_id"],
+                "transport_id": tid,
+                "stop_id": sid,
                 "departure_time": {"$gt": after},
             }
         )
@@ -84,8 +87,9 @@ def next_departures(col, params: dict) -> list:
 
 
 def trips_per_route(col, params: dict) -> list:
+    tid = int(params["transport_id"])
     pipeline = [
-        {"$match": {"type": "trips", "transport_id": params["transport_id"]}},
+        {"$match": {"type": "trips", "transport_id": tid}},
         {"$group": {"_id": "$route_id", "total_trips": {"$sum": 1}}},
         {"$sort": {"total_trips": -1}},
         {"$limit": 50},
@@ -99,7 +103,7 @@ def trips_per_route(col, params: dict) -> list:
                             "$expr": {
                                 "$and": [
                                     {"$eq": ["$type", "routes"]},
-                                    {"$eq": ["$transport_id", params["transport_id"]]},
+                                    {"$eq": ["$transport_id", tid]},
                                     {"$eq": ["$route_id", "$$rid"]},
                                 ]
                             }
@@ -117,9 +121,12 @@ def trips_per_route(col, params: dict) -> list:
 
 
 def bulk_update_departures(col, params: dict) -> list:
+    tid = int(params["transport_id"])
+    trip_id = str(params["trip_id"])
+    shift = int(params["shift"])
     result = col.update_many(
-        {"type": "stop_times", "transport_id": params["transport_id"], "trip_id": params["trip_id"]},
-        {"$inc": {"departure_time": params["shift"], "arrival_time": params["shift"]}},
+        {"type": "stop_times", "transport_id": tid, "trip_id": trip_id},
+        {"$inc": {"departure_time": shift, "arrival_time": shift}},
     )
     return [{"rowcount": result.modified_count}]
 

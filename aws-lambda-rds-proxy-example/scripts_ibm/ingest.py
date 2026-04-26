@@ -13,11 +13,11 @@ log = logging.getLogger()
 
 # ================= DB CONFIG =================
 DB_CONFIG = {
-    "host": "6c431a8d-a72f-4597-b8ee-b353e6e82086.c5km1ted03t0e8geevf0.databases.appdomain.cloud",
-    "port": 32563,
+    "host": "d5e65386-f8fc-4847-8272-f2bcabdf6bc3.0135ec03d5bf43b196433793c98e8bd5.databases.appdomain.cloud",
+    "port": 31604,
     "dbname": "ibmclouddb",
-    "user": "ibm_cloud_326db193_fdb8_4342_b196_4cde1b6c8061",
-    "password": "FeBAgu8Un96H4rfueCe2LNssmxgNYX78",
+    "user": "ibm_cloud_c56b4076_94db_4c14_bdea_e54446df05d2",
+    "password": "mKfSwfgwlWEkwZQlvbHTCa2TNGqln2le",
     "sslmode": "verify-full",
     "sslrootcert": "ibm_postgres_ca.crt"
 }
@@ -89,6 +89,12 @@ def copy(cur, table, path, cols, transform):
 def ingest(zip_file, city, transport_id):
 
     log.info(f"Starting {city}")
+
+    # Convert to absolute path before changing directory
+    zip_file = os.path.abspath(zip_file)
+
+    # Ensure the script finds the .crt file in its own directory
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
     tmp = "/tmp/gtfs"
     os.makedirs(tmp, exist_ok=True)

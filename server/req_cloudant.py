@@ -1,4 +1,5 @@
 import time
+import os
 
 import rich
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
@@ -8,7 +9,7 @@ from rich.table import Table
 from . import db_config as SG
 from req_gen import Request, RequestType, build
 
-DB = SG.CLOUDANT["db"]
+DB = os.environ.get("CLOUDANT_DB", SG.CLOUDANT["db"])
 
 
 def get_client() -> CloudantV1:
@@ -18,9 +19,20 @@ def get_client() -> CloudantV1:
     return client
 
 
+def _get_doc_safe(client: CloudantV1, db: str, doc_id: str):
+    from ibm_cloud_sdk_core import ApiException
+    try:
+        return client.get_document(db=db, doc_id=doc_id).get_result()
+    except ApiException as ae:
+        if ae.code == 404:
+            return None
+        raise
+
+
 def point_read(client: CloudantV1, params: dict) -> list:
     doc_id = f"stop:{params['transport_id']}:{params['stop_id']}"
-    return [client.get_document(db=DB, doc_id=doc_id).get_result()]
+    doc = _get_doc_safe(client, DB, doc_id)
+    return [doc] if doc else []
 
 
 def next_departures(client: CloudantV1, params: dict) -> list:
@@ -38,17 +50,16 @@ def next_departures(client: CloudantV1, params: dict) -> list:
         include_docs=True,
     ).get_result()
 
-    # SQL does this as a 3-way join. Cloudant has no joins, so each trip
-    # and route is a separate fetch — this is the honest overhead difference.
     rows = []
     for row in result.get("rows", []):
         doc = row["doc"]
-        trip = client.get_document(
-            db=DB, doc_id=f"trip:{tid}:{doc['gtfs_trip_id']}"
-        ).get_result()
-        route = client.get_document(
-            db=DB, doc_id=f"route:{tid}:{trip['gtfs_route_id']}"
-        ).get_result()
+        trip = _get_doc_safe(client, DB, f"trip:{tid}:{doc['gtfs_trip_id']}")
+        if not trip:
+            continue
+        route = _get_doc_safe(client, DB, f"route:{tid}:{trip['gtfs_route_id']}")
+        if not route:
+            continue
+
         rows.append({
             "trip_headsign": trip.get("trip_headsign"),
             "departure_time": doc.get("departure_time"),
@@ -86,13 +97,12 @@ def trips_per_route(client: CloudantV1, params: dict) -> list:
     rows = []
     for row in counts:
         route_id = row["key"][1]
-        route = client.get_document(
-            db=DB, doc_id=f"route:{tid}:{route_id}"
-        ).get_result()
-        rows.append({
-            "route_short_name": route.get("route_short_name"),
-            "total_trips": row["value"],
-        })
+        route = _get_doc_safe(client, DB, f"route:{tid}:{route_id}")
+        if route:
+            rows.append({
+                "route_short_name": route.get("route_short_name"),
+                "total_trips": row["value"],
+            })
     return sorted(rows, key=lambda r: r["total_trips"], reverse=True)[:50]
 
 
