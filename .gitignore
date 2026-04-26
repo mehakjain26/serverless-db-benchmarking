@@ -18,7 +18,6 @@ myvenv/
 
 # --- Project Data & Benchmarks ---
 data/
-results/
 logs/
 **/*.zip
 package_*/

@@ -1,0 +1,2 @@
+Method,Name,Error,Occurrences
+GET,next_departures,HTTPError('502 Server Error: Bad Gateway for url: next_departures'),7

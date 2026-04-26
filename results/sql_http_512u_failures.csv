@@ -1,0 +1,6 @@
+Method,Name,Error,Occurrences
+GET,bulk_update_departures,HTTPError('502 Server Error: Bad Gateway for url: bulk_update_departures'),15
+GET,large_scan,HTTPError('502 Server Error: Bad Gateway for url: large_scan'),37
+GET,trips_per_route,HTTPError('502 Server Error: Bad Gateway for url: trips_per_route'),7
+GET,point_read,HTTPError('502 Server Error: Bad Gateway for url: point_read'),159
+GET,next_departures,HTTPError('502 Server Error: Bad Gateway for url: next_departures'),114

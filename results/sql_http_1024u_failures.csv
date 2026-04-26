@@ -1,0 +1,11 @@
+Method,Name,Error,Occurrences
+GET,bulk_update_departures,HTTPError('502 Server Error: Bad Gateway for url: bulk_update_departures'),14
+GET,point_read,HTTPError('429 Client Error: Too Many Requests for url: point_read'),20716
+GET,large_scan,HTTPError('502 Server Error: Bad Gateway for url: large_scan'),24
+GET,trips_per_route,HTTPError('429 Client Error: Too Many Requests for url: trips_per_route'),2069
+GET,bulk_update_departures,HTTPError('429 Client Error: Too Many Requests for url: bulk_update_departures'),2037
+GET,trips_per_route,HTTPError('502 Server Error: Bad Gateway for url: trips_per_route'),13
+GET,point_read,HTTPError('502 Server Error: Bad Gateway for url: point_read'),171
+GET,next_departures,HTTPError('429 Client Error: Too Many Requests for url: next_departures'),16665
+GET,next_departures,HTTPError('502 Server Error: Bad Gateway for url: next_departures'),139
+GET,large_scan,HTTPError('429 Client Error: Too Many Requests for url: large_scan'),4246

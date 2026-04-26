@@ -1,0 +1,6 @@
+Method,Name,Error,Occurrences
+GET,bulk_update_departures,HTTPError('500 Server Error: Internal Server Error for url: bulk_update_departures'),1243
+GET,next_departures,HTTPError('500 Server Error: Internal Server Error for url: next_departures'),9979
+GET,point_read,HTTPError('500 Server Error: Internal Server Error for url: point_read'),12535
+GET,trips_per_route,HTTPError('500 Server Error: Internal Server Error for url: trips_per_route'),1240
+GET,large_scan,HTTPError('500 Server Error: Internal Server Error for url: large_scan'),2478

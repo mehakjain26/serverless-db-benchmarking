@@ -1,0 +1,3 @@
+Method,Name,Error,Occurrences
+GET,next_departures,"ReadTimeout(ReadTimeoutError(""HTTPSConnectionPool(host='squjzm5bmxt2ajq2ncxgoldjuq0kqmid.lambda-url.us-east-1.on.aws', port=443): Read timed out. (read timeout=None)""))",2
+GET,point_read,"ReadTimeout(ReadTimeoutError(""HTTPSConnectionPool(host='squjzm5bmxt2ajq2ncxgoldjuq0kqmid.lambda-url.us-east-1.on.aws', port=443): Read timed out. (read timeout=None)""))",1

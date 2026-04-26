@@ -1,0 +1,11 @@
+Method,Name,Error,Occurrences
+GET,bulk_update_departures,HTTPError('500 Server Error: Internal Server Error for url: bulk_update_departures'),647
+GET,point_read,HTTPError('429 Client Error: Too Many Requests for url: point_read'),63
+GET,next_departures,HTTPError('500 Server Error: Internal Server Error for url: next_departures'),4960
+GET,trips_per_route,HTTPError('429 Client Error: Too Many Requests for url: trips_per_route'),7
+GET,point_read,HTTPError('500 Server Error: Internal Server Error for url: point_read'),6470
+GET,bulk_update_departures,HTTPError('429 Client Error: Too Many Requests for url: bulk_update_departures'),5
+GET,trips_per_route,HTTPError('500 Server Error: Internal Server Error for url: trips_per_route'),610
+GET,large_scan,HTTPError('500 Server Error: Internal Server Error for url: large_scan'),1323
+GET,next_departures,HTTPError('429 Client Error: Too Many Requests for url: next_departures'),50
+GET,large_scan,HTTPError('429 Client Error: Too Many Requests for url: large_scan'),16
