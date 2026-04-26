@@ -3,9 +3,9 @@ from locust import LoadTestShape
 # Compressed transit day. Durations are in seconds.
 # Locust smoothly ramps users to the target at spawn_rate between stages.
 STAGES = [
-    {"duration": 300, "users": 80, "spawn_rate": 5, "label": "morning_rush"},
+    {"duration": 300, "users": 100, "spawn_rate": 20, "label": "morning_rush"},
     {"duration": 180, "users": 1, "spawn_rate": 20, "label": "midday"},
-    {"duration": 300, "users": 80, "spawn_rate": 5, "label": "evening_rush"},
+    {"duration": 300, "users": 100, "spawn_rate": 20, "label": "evening_rush"},
     {"duration": 90, "users": 1, "spawn_rate": 20, "label": "night"},
 ]
 
