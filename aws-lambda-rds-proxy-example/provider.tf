@@ -20,6 +20,11 @@ provider "aws" {
   region = var.aws_region
 }
 
+provider "aws" {
+  alias   = "dynamo_acc"
+  region  = "us-east-1"
+  profile = "bench-dynamo"
+}
 
 provider "ibm" {
   region           = "us-south"

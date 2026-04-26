@@ -9,7 +9,16 @@ from req_gen import Request, RequestType, build
 
 
 def get_client() -> MongoClient:
-    return MongoClient(SG.MONGO["uri"])
+    return MongoClient(
+        SG.MONGO["uri"],
+        serverSelectionTimeoutMS=30000,
+        connectTimeoutMS=10000,
+        socketTimeoutMS=60000,
+        retryWrites=True,
+        retryReads=True,
+        maxPoolSize=1,
+        appname="GTFS-Bench"
+    )
 
 
 def get_col(client: MongoClient):
@@ -62,14 +71,14 @@ def next_departures(col, params: dict) -> list:
     trips = {
         t["trip_id"]: t
         for t in col.find(
-            {"type": "trips", "transport_id": params["transport_id"], "trip_id": {"$in": trip_ids}}
+            {"type": "trips", "transport_id": tid, "trip_id": {"$in": trip_ids}}
         )
     }
     route_ids = list({t.get("route_id") for t in trips.values() if t.get("route_id")})
     routes = {
         r["route_id"]: r
         for r in col.find(
-            {"type": "routes", "transport_id": params["transport_id"], "route_id": {"$in": route_ids}}
+            {"type": "routes", "transport_id": tid, "route_id": {"$in": route_ids}}
         )
     }
 

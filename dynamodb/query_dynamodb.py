@@ -6,11 +6,14 @@ from collections import defaultdict
 import boto3
 from boto3.dynamodb.conditions import Key
 
+import os
 AWS_REGION = "us-east-1"
-TABLE_NAME = "gtfs"
+# DYNAMO_TABLE may be a name or a full ARN
+DYNAMO_PATH = os.environ.get("DYNAMO_TABLE", "gtfs")
+TABLE_NAME = DYNAMO_PATH.split("/")[-1] if "/" in DYNAMO_PATH else DYNAMO_PATH
 
 dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
-table = dynamodb.Table(TABLE_NAME)
+table = dynamodb.Table(DYNAMO_PATH)
 
 
 # ================= HELPERS =================
@@ -103,26 +106,25 @@ def next_departures(transport_id, stop_id, after_time):
     if not stop_times:
         return []
 
-    # Collect unique trip_ids and look up trips
+    # Lookup trips (Direct O(1) lookup using full ARN)
     trip_ids = list({st["trip_id"] for st in stop_times})
     trips = {}
     for tid in trip_ids:
-        # Trips SK is "{route_id}#{trip_id}" — use begins_with on SK isn't straightforward,
-        # so use a GSI-free approach: scan trips partition for this transport_id and filter.
-        # For datasets with many trips, consider adding a GSI on trip_id.
-        resp_t = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{transport_id}#trips"),
-            FilterExpression=boto3.dynamodb.conditions.Attr("trip_id").eq(tid),
-        )
-        if resp_t["Items"]:
-            t = resp_t["Items"][0]
-            trips[tid] = t
+        resp_t = table.get_item(Key={
+            "pk": f"{transport_id}#trips", 
+            "sk": f"{transport_id}#{tid}"
+        })
+        if resp_t.get("Item"):
+            trips[tid] = resp_t["Item"]
 
-    # Collect unique route_ids and look up routes
+    # Lookup routes (Direct O(1) lookup using full ARN)
     route_ids = list({t.get("route_id") for t in trips.values() if t.get("route_id")})
     routes = {}
     for rid in route_ids:
-        resp_r = table.get_item(Key={"pk": f"{transport_id}#routes", "sk": rid})
+        resp_r = table.get_item(Key={
+            "pk": f"{transport_id}#routes", 
+            "sk": rid
+        })
         if resp_r.get("Item"):
             routes[rid] = resp_r["Item"]
 
@@ -131,9 +133,9 @@ def next_departures(transport_id, stop_id, after_time):
         trip  = trips.get(st["trip_id"], {})
         route = routes.get(trip.get("route_id", ""), {})
         result.append({
-            "headsign":         trip.get("headsign"),
+            "headsign":         trip.get("headsign") or trip.get("trip_headsign"),
             "departure_time":   st.get("departure_time"),
-            "route_short_name": route.get("short_name"),
+            "route_short_name": route.get("short_name") or route.get("route_short_name"),
             "route_color":      route.get("route_color"),
         })
 
@@ -158,9 +160,7 @@ def trips_per_route(transport_id):
         resp = table.get_item(Key={"pk": f"{transport_id}#routes", "sk": route_id})
         route = resp.get("Item", {})
         result.append({
-            "route_id":         route_id,
-            "route_short_name": route.get("short_name"),
-            "route_long_name":  route.get("long_name"),
+            "route_short_name": route.get("short_name") or route.get("route_short_name"),
             "total_trips":      total_trips,
         })
 

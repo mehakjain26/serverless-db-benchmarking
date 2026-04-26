@@ -9,7 +9,7 @@ FUNCTION_URL_NEON = "https://npefkdvgfzdxr6adqh43khhhuq0legzg.lambda-url.us-east
 FUNCTION_URL_IBM_SQL = "https://3ekiips2t3l6lveodt2hvsaq4m0sgyjr.lambda-url.us-east-1.on.aws/"
 FUNCTION_URL_CLOUDANT = "https://vniwxhyrzfp5pndmer4grjdjey0hexwq.lambda-url.us-east-1.on.aws/"
 FUNCTION_URL_MONGO = "https://w7th34c5pmhicjw2uauiz476ie0ovtkl.lambda-url.us-east-1.on.aws/"
-FUNCTION_URL_DYNAMODB = ""
+FUNCTION_URL_DYNAMODB = "https://squjzm5bmxt2ajq2ncxgoldjuq0kqmid.lambda-url.us-east-1.on.aws/"
 
 DEPARTURE_AFTER = 0
 WRITE_SHIFT_SECS = 0
@@ -35,6 +35,6 @@ SPAWN_RATE = 20
 RUN_TIME = "2m30s"
 RESULTS_DIR = "results"
 
-COLD_START_IDLE_SECS = 420
+COLD_START_IDLE_SECS = 480
 COLD_START_SAMPLES = 5
 COLD_START_WARM_REPS = 10

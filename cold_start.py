@@ -17,7 +17,7 @@ RESULTS_DIR = Path(G.RESULTS_DIR)
 OUTPUT_CSV = RESULTS_DIR / "cold_start.csv"
 
 
-def probe(url: str, catalog: dict) -> float:
+def probe(url: str, catalog: dict) -> tuple[float, float]:
     params = {
         "op": "point_read",
         "transport_id": catalog["transport_id"],
@@ -25,18 +25,33 @@ def probe(url: str, catalog: dict) -> float:
     }
     t0 = time.perf_counter()
     r = requests.get(url, params=params, timeout=60)
+    total_ms = (time.perf_counter() - t0) * 1000
     r.raise_for_status()
-    return (time.perf_counter() - t0) * 1000
+    
+    # Extract internal latency reported by the Lambda itself
+    try:
+        body = r.json()
+        internal_ms = body.get("latency_ms", 0.0)
+    except:
+        internal_ms = 0.0
+        
+    return total_ms, internal_ms
 
 
-def warm_baseline(url: str, catalog: dict, reps: int) -> float:
-    times = []
+def warm_baseline(url: str, catalog: dict, reps: int) -> tuple[float, float]:
+    total_times = []
+    internal_times = []
     for _ in range(reps):
         try:
-            times.append(probe(url, catalog))
+            t, i = probe(url, catalog)
+            total_times.append(t)
+            internal_times.append(i)
         except Exception as e:
             rich.print(f"    [yellow]warm probe error: {e}[/yellow]")
-    return sum(times) / len(times) if times else float("nan")
+    
+    avg_total = sum(total_times) / len(total_times) if total_times else 0.0
+    avg_internal = sum(internal_times) / len(internal_times) if internal_times else 0.0
+    return avg_total, avg_internal
 
 
 def load_catalog() -> list[dict]:
@@ -79,8 +94,8 @@ def main():
         rich.print(Rule(f"Sample {sample_num}/{args.samples}"))
 
         rich.print(f"  Warming ({args.warm_reps} reps)...", end=" ")
-        warm_avg = warm_baseline(url, catalog, args.warm_reps)
-        rich.print(f"[green]{warm_avg:.1f} ms[/green] avg")
+        warm_total, warm_internal = warm_baseline(url, catalog, args.warm_reps)
+        rich.print(f"[green]{warm_total:.1f}ms[/green] RTT ([dim]{warm_internal:.1f}ms internal[/dim])")
 
         rich.print(f"\n  [dim]Idling {args.idle}s...[/dim]", end="", flush=True)
         time.sleep(args.idle)
@@ -88,24 +103,30 @@ def main():
 
         rich.print("  Cold probe...", end=" ")
         try:
-            cold_ms = probe(url, catalog)
-            delta = cold_ms - warm_avg
-            color = "red" if delta > 1000 else "yellow" if delta > 200 else "green"
-            rich.print(f"[{color}]{cold_ms:.1f} ms[/{color}]  (delta=[{color}]{delta:+.1f} ms[/{color}])")
+            cold_total, cold_internal = probe(url, catalog)
+            
+            # Init Overhead = Time spent BEFORE the Lambda code started (Container spin-up)
+            init_overhead = cold_total - cold_internal
+            
+            # DB Wakeup = How much slower the DB query was compared to warm state
+            db_wakeup = cold_internal - warm_internal
+            
+            color = "red" if init_overhead > 1000 else "yellow" if init_overhead > 200 else "green"
+            rich.print(f"[{color}]{cold_total:.1f} ms[/{color}]  (Init Overhead=[{color}]{init_overhead:.1f} ms[/{color}], DB Wakeup={db_wakeup:+.1f} ms)")
         except Exception as e:
-            cold_ms = float("nan")
-            delta = float("nan")
+            cold_total = cold_internal = init_overhead = db_wakeup = float("nan")
             rich.print(f"[red]ERROR: {e}[/red]")
 
         rows.append({
             "service": args.service,
             "sample": sample_num,
-            "warm_avg_ms": round(warm_avg, 3),
-            "cold_ms": round(cold_ms, 3),
-            "delta_ms": round(delta, 3),
+            "warm_rtt": round(warm_total, 2),
+            "cold_rtt": round(cold_total, 2),
+            "init_overhead": round(init_overhead, 2),
+            "db_wakeup": round(db_wakeup, 2),
         })
 
-    fieldnames = ["service", "sample", "warm_avg_ms", "cold_ms", "delta_ms"]
+    fieldnames = ["service", "sample", "warm_rtt", "cold_rtt", "init_overhead", "db_wakeup"]
     write_header = not OUTPUT_CSV.exists()
     with open(OUTPUT_CSV, "a", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -113,28 +134,21 @@ def main():
             writer.writeheader()
         writer.writerows(rows)
 
-    t = Table(title="Cold Start Summary", show_lines=True)
+    t = Table(title="Cold Start Analysis (High-Res)", show_lines=True)
     t.add_column("Sample", justify="right")
-    t.add_column("Warm avg (ms)", justify="right")
-    t.add_column("Cold (ms)", justify="right")
-    t.add_column("Delta (ms)", justify="right")
+    t.add_column("Warm RTT", justify="right")
+    t.add_column("Cold RTT", justify="right")
+    t.add_column("Init Overhead (Lambda)", justify="right", style="cyan")
+    t.add_column("DB Wakeup", justify="right", style="magenta")
 
     for r in rows:
-        delta = r["delta_ms"]
-        color = "red" if delta > 1000 else "yellow" if delta > 200 else "green"
-        t.add_row(str(r["sample"]), f"{r['warm_avg_ms']:.1f}",
-                  f"[{color}]{r['cold_ms']:.1f}[/{color}]",
-                  f"[{color}]{delta:+.1f}[/{color}]")
-
-    valid = [r for r in rows if r["cold_ms"] == r["cold_ms"]]
-    if valid:
-        avg_warm = sum(r["warm_avg_ms"] for r in valid) / len(valid)
-        avg_cold = sum(r["cold_ms"] for r in valid) / len(valid)
-        avg_delta = sum(r["delta_ms"] for r in valid) / len(valid)
-        color = "red" if avg_delta > 1000 else "yellow" if avg_delta > 200 else "green"
-        t.add_row("[bold]avg[/bold]", f"[bold]{avg_warm:.1f}[/bold]",
-                  f"[bold][{color}]{avg_cold:.1f}[/{color}][/bold]",
-                  f"[bold][{color}]{avg_delta:+.1f}[/{color}][/bold]")
+        t.add_row(
+            str(r["sample"]), 
+            f"{r['warm_rtt']:.1f}",
+            f"{r['cold_rtt']:.1f}",
+            f"{r['init_overhead']:.1f}",
+            f"{r['db_wakeup']:+.1f}"
+        )
 
     rich.print(t)
     rich.print(f"\nResults written to [bold]{OUTPUT_CSV}[/bold]")
