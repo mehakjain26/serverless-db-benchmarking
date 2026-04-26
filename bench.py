@@ -19,6 +19,7 @@ FUNCTION_URLS = {
     "ibm_sql": G.FUNCTION_URL_IBM_SQL,
     "cloudant": G.FUNCTION_URL_CLOUDANT,
     "mongo": G.FUNCTION_URL_MONGO,
+    "dynamodb": G.FUNCTION_URL_DYNAMODB,
 }
 
 # Adapters that reuse another adapter's locustfile with an env override

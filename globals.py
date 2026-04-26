@@ -9,6 +9,7 @@ FUNCTION_URL_NEON = "https://npefkdvgfzdxr6adqh43khhhuq0legzg.lambda-url.us-east
 FUNCTION_URL_IBM_SQL = "https://3ekiips2t3l6lveodt2hvsaq4m0sgyjr.lambda-url.us-east-1.on.aws/"
 FUNCTION_URL_CLOUDANT = "https://vniwxhyrzfp5pndmer4grjdjey0hexwq.lambda-url.us-east-1.on.aws/"
 FUNCTION_URL_MONGO = "https://w7th34c5pmhicjw2uauiz476ie0ovtkl.lambda-url.us-east-1.on.aws/"
+FUNCTION_URL_DYNAMODB = ""
 
 DEPARTURE_AFTER = 0
 WRITE_SHIFT_SECS = 0

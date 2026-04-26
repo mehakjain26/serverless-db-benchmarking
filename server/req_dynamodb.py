@@ -17,7 +17,7 @@ def execute(req: Request) -> "tuple[list, float]":
         result = point_read(req.params["transport_id"], req.params["stop_id"])
         rows = [result] if result else []
     elif req.type == RequestType.LARGE_SCAN:
-        rows = large_scan(req.params["transport_id"], req.params["limit"])
+        rows = large_scan(req.params["transport_id"], int(req.params["limit"]))
     elif req.type == RequestType.NEXT_DEPARTURES:
         rows = next_departures(req.params["transport_id"], req.params["stop_id"], req.params["after"])
     elif req.type == RequestType.TRIPS_PER_ROUTE:

@@ -123,8 +123,9 @@ def fig_diurnal_per_adapter(history: dict, labels: dict) -> None:
         ax_lat.set_ylim(bottom=0)
         ax_lat.set_xlim(0, TOTAL_DURATION)
 
-        ax_rps.plot(hdf["elapsed_s"], hdf["Requests/s"], linewidth=2, color="#55A868")
-        ax_rps.set_ylabel("req/s", fontsize=11)
+        success_rps = (hdf["Requests/s"] - hdf["Failures/s"]).clip(lower=0)
+        ax_rps.plot(hdf["elapsed_s"], success_rps, linewidth=2, color="#55A868")
+        ax_rps.set_ylabel("throughput (req/s)", fontsize=11)
         ax_rps.grid(True, axis="y")
         ax_rps.set_ylim(bottom=0)
 
@@ -132,7 +133,7 @@ def fig_diurnal_per_adapter(history: dict, labels: dict) -> None:
         ax_fail.plot(hdf["elapsed_s"], fail_pct, linewidth=2, color="#F44336")
         ax_fail.set_ylabel("failure %", fontsize=11)
         ax_fail.grid(True, axis="y")
-        ax_fail.set_ylim(0, 100)
+        ax_fail.set_ylim(0, 110)
 
         ax_users.plot(hdf["elapsed_s"], hdf["User Count"], linewidth=2, color="#8172B2")
         ax_users.set_xlabel("elapsed (s)", fontsize=11)
@@ -166,7 +167,8 @@ def fig_diurnal_comparison(history: dict, labels: dict) -> None:
         fail_pct = (hdf["Failures/s"] / hdf["Requests/s"].replace(0, float("nan")) * 100).fillna(0)
 
         ax_lat.plot(hdf["elapsed_s"], hdf["50%"], label=lbl, linewidth=2, color=col)
-        ax_rps.plot(hdf["elapsed_s"], hdf["Requests/s"], label=lbl, linewidth=2, color=col)
+        success_rps = (hdf["Requests/s"] - hdf["Failures/s"]).clip(lower=0)
+        ax_rps.plot(hdf["elapsed_s"], success_rps, label=lbl, linewidth=2, color=col)
         ax_fail.plot(hdf["elapsed_s"], fail_pct, label=lbl, linewidth=2, color=col)
         ax_users.plot(hdf["elapsed_s"], hdf["User Count"], linewidth=2, color=col, label=lbl)
 
@@ -176,7 +178,7 @@ def fig_diurnal_comparison(history: dict, labels: dict) -> None:
     ax_lat.set_ylim(bottom=0)
     ax_lat.set_xlim(0, TOTAL_DURATION)
 
-    ax_rps.set_ylabel("req/s", fontsize=11)
+    ax_rps.set_ylabel("throughput (req/s)", fontsize=11)
     ax_rps.legend(fontsize=9)
     ax_rps.grid(True, axis="y")
     ax_rps.set_ylim(bottom=0)
@@ -253,7 +255,7 @@ def main():
     for fn in [
         lambda: fig_diurnal_per_adapter(history, labels),
         lambda: fig_diurnal_comparison(history, labels),
-        lambda: fig_diurnal_per_op(history, labels),
+        # lambda: fig_diurnal_per_op(history, labels),
     ]:
         try:
             fn()
