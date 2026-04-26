@@ -16,13 +16,15 @@ RESULTS = ROOT / G.RESULTS_DIR
 FUNCTION_URLS = {
     "sql": G.FUNCTION_URL_POSTGRES,
     "neon": G.FUNCTION_URL_POSTGRES,
+    "ibm_sql": G.FUNCTION_URL_IBM_SQL,
     "cloudant": G.FUNCTION_URL_CLOUDANT,
-    "mongo": "",
+    "mongo": ""
 }
 
 # Adapters that reuse another adapter's locustfile with an env override
 ADAPTER_ALIASES = {
     "neon": ("sql", {"BENCH_DB": "neon"}),
+    "ibm_sql": ("sql", {"BENCH_DB": "ibm_sql"}),
 }
 
 

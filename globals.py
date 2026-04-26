@@ -5,7 +5,9 @@ TRANSPORT_ID = 1
 FUNCTION_URL_POSTGRES = (
     "https://hixavovpmato33sqqyxh6omv540acpnn.lambda-url.us-east-1.on.aws/"
 )
-FUNCTION_URL_CLOUDANT = ""
+FUNCTION_URL_IBM_SQL = "https://3ekiips2t3l6lveodt2hvsaq4m0sgyjr.lambda-url.us-east-1.on.aws/"
+FUNCTION_URL_CLOUDANT = "https://vniwxhyrzfp5pndmer4grjdjey0hexwq.lambda-url.us-east-1.on.aws/"
+FUNCTION_URL_MONGO = "https://w7th34c5pmhicjw2uauiz476ie0ovtkl.lambda-url.us-east-1.on.aws/"
 
 DEPARTURE_AFTER = 0
 WRITE_SHIFT_SECS = 0
@@ -25,7 +27,7 @@ TASK_WEIGHTS = {
 
 POOL_MAX_CONN = 50
 CATALOG_POOL_SIZE = 200
-CONCURRENCY_LEVELS = [1, 5, 35, 90]
+CONCURRENCY_LEVELS = [16,64,128,256,512,1024]
 COOLDOWN_SECS = 0
 SPAWN_RATE = 20
 RUN_TIME = "2m30s"
