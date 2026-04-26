@@ -1,0 +1,20 @@
+pip install awscli boto3
+
+Create an IAM user with "AmazonDynamoDBFullAccess" policy. Then run:
+aws configure
+AWS Access Key ID [None]: YOUR_AWS_ACCESS_KEY_ID
+AWS Secret Access Key [None]: YOUR_AWS_SECRET_ACCESS_KEY
+Default region name [None]: us-east-1
+Default output format [None]: 
+
+python3 indices_dynamodb.py
+
+python3 ingest_dynamodb.py "/Users/raghavanb/Downloads/Raghavan/Purdue/Cloud/project/data/data/columbus.zip" "Columbus" 2
+
+python3 query_dynamodb.py POINT_READ 2 113112
+python3 query_dynamodb.py LARGE_SCAN 2 1000
+python3 query_dynamodb.py NEXT_DEPARTURES 2 113112 360
+python3 query_dynamodb.py TRIPS_PER_ROUTE 2
+python3 query_dynamodb.py BULK_UPDATE_DEPARTURES 2 10945438 60
+
+python3 del_dynamodb.py

@@ -106,13 +106,13 @@ def fig_diurnal_per_adapter(history: dict, labels: dict) -> None:
         hdf = hdf_full[hdf_full["Name"] == "Aggregated"]
         lbl = run_label(labels, run_key)
 
-        fig, (ax_lat, ax_rps, ax_users) = plt.subplots(
-            3, 1, figsize=(12, 9), sharex=True,
-            gridspec_kw={"height_ratios": [2, 1, 1]},
+        fig, (ax_lat, ax_rps, ax_fail, ax_users) = plt.subplots(
+            4, 1, figsize=(12, 11), sharex=True,
+            gridspec_kw={"height_ratios": [2, 1, 1, 1]},
         )
         fig.suptitle(f"{lbl}: Diurnal Load Pattern", fontsize=13, fontweight="bold")
 
-        add_phase_bands([ax_lat, ax_rps, ax_users])
+        add_phase_bands([ax_lat, ax_rps, ax_fail, ax_users])
         add_phase_labels(ax_lat)
 
         ax_lat.plot(hdf["elapsed_s"], hdf["50%"], label="p50", linewidth=2, color=PCTILE_COLORS["p50"])
@@ -127,6 +127,12 @@ def fig_diurnal_per_adapter(history: dict, labels: dict) -> None:
         ax_rps.set_ylabel("req/s", fontsize=11)
         ax_rps.grid(True, axis="y")
         ax_rps.set_ylim(bottom=0)
+
+        fail_pct = (hdf["Failures/s"] / hdf["Requests/s"].replace(0, float("nan")) * 100).fillna(0)
+        ax_fail.plot(hdf["elapsed_s"], fail_pct, linewidth=2, color="#F44336")
+        ax_fail.set_ylabel("failure %", fontsize=11)
+        ax_fail.grid(True, axis="y")
+        ax_fail.set_ylim(0, 100)
 
         ax_users.plot(hdf["elapsed_s"], hdf["User Count"], linewidth=2, color="#8172B2")
         ax_users.set_xlabel("elapsed (s)", fontsize=11)
@@ -143,13 +149,13 @@ def fig_diurnal_comparison(history: dict, labels: dict) -> None:
     if len(history) < 2:
         return
 
-    fig, (ax_lat, ax_rps, ax_users) = plt.subplots(
-        3, 1, figsize=(13, 10), sharex=True,
-        gridspec_kw={"height_ratios": [2, 1, 1]},
+    fig, (ax_lat, ax_rps, ax_fail, ax_users) = plt.subplots(
+        4, 1, figsize=(13, 12), sharex=True,
+        gridspec_kw={"height_ratios": [2, 1, 1, 1]},
     )
     fig.suptitle("Diurnal Load Pattern: Adapter Comparison", fontsize=13, fontweight="bold")
 
-    add_phase_bands([ax_lat, ax_rps, ax_users])
+    add_phase_bands([ax_lat, ax_rps, ax_fail, ax_users])
     add_phase_labels(ax_lat)
 
     for i, (run_key, hdf_full) in enumerate(sorted(history.items())):
@@ -157,8 +163,11 @@ def fig_diurnal_comparison(history: dict, labels: dict) -> None:
         lbl = run_label(labels, run_key)
         col = ADAPTER_COLORS[i % len(ADAPTER_COLORS)]
 
+        fail_pct = (hdf["Failures/s"] / hdf["Requests/s"].replace(0, float("nan")) * 100).fillna(0)
+
         ax_lat.plot(hdf["elapsed_s"], hdf["50%"], label=lbl, linewidth=2, color=col)
         ax_rps.plot(hdf["elapsed_s"], hdf["Requests/s"], label=lbl, linewidth=2, color=col)
+        ax_fail.plot(hdf["elapsed_s"], fail_pct, label=lbl, linewidth=2, color=col)
         ax_users.plot(hdf["elapsed_s"], hdf["User Count"], linewidth=2, color=col, label=lbl)
 
     ax_lat.set_ylabel("p50 latency (ms)", fontsize=11)
@@ -171,6 +180,11 @@ def fig_diurnal_comparison(history: dict, labels: dict) -> None:
     ax_rps.legend(fontsize=9)
     ax_rps.grid(True, axis="y")
     ax_rps.set_ylim(bottom=0)
+
+    ax_fail.set_ylabel("failure %", fontsize=11)
+    ax_fail.legend(fontsize=9)
+    ax_fail.grid(True, axis="y")
+    ax_fail.set_ylim(0, 100)
 
     ax_users.set_xlabel("elapsed (s)", fontsize=11)
     ax_users.set_ylabel("users", fontsize=11)
