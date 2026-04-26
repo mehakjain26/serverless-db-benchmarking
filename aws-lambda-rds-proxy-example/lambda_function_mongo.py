@@ -2,34 +2,30 @@ import json
 import logging
 import os
 
-from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
-from ibmcloudant.cloudant_v1 import CloudantV1
+from pymongo import MongoClient
 
 # Import the benchmarking query engine
 from req_gen import Request, RequestType
-from server.req_cloudant import execute
+from server.req_mongo import execute, get_col
 
 # Setup logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 # Global client to keep persistent across warm starts
-cloudant_client = None
+mongo_client = None
 
-def get_client():
-    global cloudant_client
+def get_mongo_client():
+    global mongo_client
     
-    if cloudant_client is not None:
-        return cloudant_client
+    if mongo_client is not None:
+        return mongo_client
 
-    apikey = os.environ['CLOUDANT_APIKEY']
-    url = os.environ['CLOUDANT_URL']
-
-    logger.info(f"Connecting to Cloudant at: {url}")
-    auth = IAMAuthenticator(apikey)
-    cloudant_client = CloudantV1(authenticator=auth)
-    cloudant_client.set_service_url(url)
-    return cloudant_client
+    mongo_uri = os.environ['MONGO_URI']
+    logger.info("Connecting to MongoDB...")
+    # We set a fast connect timeout because SRV records can sometimes be slow to resolve initially
+    mongo_client = MongoClient(mongo_uri, connectTimeoutMS=5000, serverSelectionTimeoutMS=5000)
+    return mongo_client
 
 def lambda_handler(event, context):
     try:
@@ -44,11 +40,12 @@ def lambda_handler(event, context):
         req = Request(type=RequestType(op_name), params=params)
         logger.info(f"Handling op: {op_name}")
 
-        # 2. Get Persistent Client
-        client = get_client()
+        # 2. Get Persistent Client and Collection
+        client = get_mongo_client()
+        col = get_col(client)
 
         # 3. Execute Benchmarking Logic
-        rows, latency_ms = execute(client, req)
+        rows, latency_ms = execute(col, req)
 
         return {
             'statusCode': 200,

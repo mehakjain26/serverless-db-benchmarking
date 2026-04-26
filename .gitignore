@@ -1,4 +1,4 @@
-# Python
+# --- Python ---
 __pycache__/
 *.py[cod]
 *$py.class
@@ -8,25 +8,29 @@ venv/
 myvenv/
 .env
 
-# Terraform
+# --- Terraform ---
 .terraform/
 *.tfstate
 *.tfstate.backup
 *.tfvars
+*.tfvars.json
 .terraform.lock.hcl
 
-# Project Specific Data & Temporary Files
+# --- Project Data & Benchmarks ---
 data/
 results/
-*.zip
-*.json
-/tmp/gtfs
-codebook.toml
+logs/
+**/*.zip
+package_*/
 lambda_function/
-scripts/test.py
+!package.json
+/tmp/gtfs
+"* copy.py"
+"**/test.py"
+"*_old.py"
 
-# OS
+# --- OS ---
 .DS_Store
 Thumbs.db
-data/*
-__pycache__
+.history/
+*.log

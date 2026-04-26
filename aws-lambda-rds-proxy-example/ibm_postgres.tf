@@ -21,7 +21,7 @@ resource "ibm_database" "postgres" {
   group {
     group_id = "member"
     memory {
-      allocation_mb = 2048 # 2GB
+      allocation_mb = 8192 # 8GB
     }
     disk {
       allocation_mb = 5120 # 5GB
@@ -78,6 +78,15 @@ resource "aws_lambda_function" "lambda_ibm" {
   source_code_hash = fileexists("lambda_function_ibm.zip") ? filebase64sha256("lambda_function_ibm.zip") : ""
 }
 
+resource "aws_lambda_function_url" "lambda_ibm_url" {
+  function_name      = aws_lambda_function.lambda_ibm.function_name
+  authorization_type = "NONE"
+}
+
+output "lambda_ibm_function_url" {
+  value = aws_lambda_function_url.lambda_ibm_url.function_url
+}
+
 # --- 5. AWS Lambda connecting to Cloudant ---
 resource "aws_lambda_function" "lambda_cloudant" {
   filename         = "lambda_function_cloudant.zip"
@@ -89,10 +98,47 @@ resource "aws_lambda_function" "lambda_cloudant" {
 
   environment {
     variables = {
-      CLOUDANT_APIKEY = "JjKdiiC57TeQuW3ymUe-CFyQSumbNBYDYGr-Cddv0FNa"
-      CLOUDANT_URL    = "https://41d4f0e7-8673-4ce6-998c-3906c7106fea-bluemix.cloudantnosqldb.appdomain.cloud"
+      CLOUDANT_APIKEY = "suNVFvme59ieXqmRCTTJNaLeFenMzhj0YsrKca-in6Kc"
+      CLOUDANT_URL    = "https://c078c512-de59-4236-8ebf-39f311b26cae-bluemix.cloudantnosqldb.appdomain.cloud"
+      CLOUDANT_DB     = "gtfs"
     }
   }
 
   source_code_hash = fileexists("lambda_function_cloudant.zip") ? filebase64sha256("lambda_function_cloudant.zip") : ""
+}
+
+resource "aws_lambda_function_url" "lambda_cloudant_url" {
+  function_name      = aws_lambda_function.lambda_cloudant.function_name
+  authorization_type = "NONE"
+}
+
+output "lambda_cloudant_function_url" {
+  value = aws_lambda_function_url.lambda_cloudant_url.function_url
+}
+
+# --- 6. AWS Lambda connecting to MongoDB ---
+resource "aws_lambda_function" "lambda_mongo" {
+  filename         = "lambda_function_mongo.zip"
+  function_name    = "mongo-lambda"
+  role             = aws_iam_role.lambda_exec.arn
+  handler          = "lambda_function_mongo.lambda_handler"
+  runtime          = "python3.12"
+  timeout          = 120
+
+  environment {
+    variables = {
+      MONGO_URI = "mongodb+srv://dbUser:dbUserPassword@cluster0.orkddvx.mongodb.net/?appName=Cluster0"
+    }
+  }
+
+  source_code_hash = fileexists("lambda_function_mongo.zip") ? filebase64sha256("lambda_function_mongo.zip") : ""
+}
+
+resource "aws_lambda_function_url" "lambda_mongo_url" {
+  function_name      = aws_lambda_function.lambda_mongo.function_name
+  authorization_type = "NONE"
+}
+
+output "lambda_mongo_function_url" {
+  value = aws_lambda_function_url.lambda_mongo_url.function_url
 }
