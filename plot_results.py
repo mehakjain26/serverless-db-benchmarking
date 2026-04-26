@@ -11,6 +11,7 @@ import rich
 from matplotlib.figure import Figure
 
 import globals as G
+from diurnal_shape import STAGES as DIURNAL_STAGES
 
 RESULTS_DIR = Path(G.RESULTS_DIR)
 FIGURES_DIR = RESULTS_DIR / "figures"

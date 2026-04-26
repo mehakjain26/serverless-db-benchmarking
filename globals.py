@@ -1,6 +1,6 @@
 from server.db_config import CLOUDANT, NEON, POSTGRES  # noqa: F401
 
-TRANSPORT_ID = 2  # 1=Lafayette, 2=Atlanta, 3=Columbus
+TRANSPORT_ID = 1
 
 FUNCTION_URL_POSTGRES = (
     "https://hixavovpmato33sqqyxh6omv540acpnn.lambda-url.us-east-1.on.aws/"

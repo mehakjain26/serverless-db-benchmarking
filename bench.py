@@ -26,7 +26,7 @@ ADAPTER_ALIASES = {
 }
 
 
-OP_CHOICES = ["point_read", "next_departures", "large_scan", "trips_per_route", "bulk_update_departures"]
+OP_CHOICES = ["point_read", "next_departures", "large_scan", "trips_per_route", "bulk_update_departures", "triple_agg"]
 
 
 def parse_args():
@@ -38,6 +38,8 @@ def parse_args():
     p.add_argument("--time", default=G.RUN_TIME)
     p.add_argument("--op", choices=OP_CHOICES, default=None, metavar="OP",
                    help="run only this operation type")
+    p.add_argument("--diurnal", action="store_true",
+                   help="use diurnal load shape instead of fixed concurrency levels")
     p.add_argument("--label", default="", help="human-readable name for this run (used in plot titles)")
     for name in FUNCTION_URLS:
         p.add_argument(f"--url-{name}", default=None, metavar="URL")
@@ -48,25 +50,28 @@ def resolve_url(adapter: str, args) -> str:
     return getattr(args, f"url_{adapter}", None) or FUNCTION_URLS.get(adapter, "")
 
 
-def run_locust(adapter, locustfile, host, users, spawn, run_time, label, extra_env=None):
+def run_locust(adapter, locustfile, host, users, spawn, run_time, label, extra_env=None, diurnal=False):
     csv_path = str(RESULTS / label)
     html_path = str(RESULTS / f"{label}.html")
 
+    locustfile_arg = f"{locustfile.name},{ROOT / 'diurnal_shape.py'}" if diurnal else locustfile.name
+
     cmd = [
         sys.executable, "-m", "locust",
-        "-f", locustfile.name,
+        "-f", locustfile_arg,
         "--host", host,
-        "-u", str(users),
-        "-r", str(spawn),
-        "--run-time", run_time,
         "--headless",
         "--csv", csv_path,
         "--csv-full-history",
         "--html", html_path,
     ]
 
+    if not diurnal:
+        cmd += ["-u", str(users), "-r", str(spawn), "--run-time", run_time]
+
     rich.print(f"\n[bold]{'=' * 60}[/bold]")
-    rich.print(f"  [bold]{label}[/bold]  (users={users} spawn={spawn} time={run_time})")
+    mode_info = "diurnal shape" if diurnal else f"users={users} spawn={spawn} time={run_time}"
+    rich.print(f"  [bold]{label}[/bold]  ({mode_info})")
     rich.print(f"  host:   {host}")
     rich.print(f"  output: {csv_path}_stats.csv")
     rich.print(f"[bold]{'=' * 60}[/bold]")
@@ -110,21 +115,35 @@ def main():
         if args.label:
             (RESULTS / f"{run_stem}.label").write_text(args.label)
 
-        for i, users in enumerate(args.users):
-            if i > 0 and G.COOLDOWN_SECS > 0:
-                rich.print(f"\n[dim]Cooling down {G.COOLDOWN_SECS}s...[/dim]")
-                time.sleep(G.COOLDOWN_SECS)
-            op_env = {"BENCH_OP": args.op} if args.op else {}
+        op_env = {"BENCH_OP": args.op} if args.op else {}
+
+        if args.diurnal:
             run_locust(
                 adapter=adapter,
                 locustfile=locustfile,
                 host=host,
-                users=users,
-                spawn=args.spawn,
-                run_time=args.time,
-                label=f"{run_stem}_{users}u",
+                users=None,
+                spawn=None,
+                run_time=None,
+                label=f"{run_stem}_diurnal",
                 extra_env={**alias_env, **op_env},
+                diurnal=True,
             )
+        else:
+            for i, users in enumerate(args.users):
+                if i > 0 and G.COOLDOWN_SECS > 0:
+                    rich.print(f"\n[dim]Cooling down {G.COOLDOWN_SECS}s...[/dim]")
+                    time.sleep(G.COOLDOWN_SECS)
+                run_locust(
+                    adapter=adapter,
+                    locustfile=locustfile,
+                    host=host,
+                    users=users,
+                    spawn=args.spawn,
+                    run_time=args.time,
+                    label=f"{run_stem}_{users}u",
+                    extra_env={**alias_env, **op_env},
+                )
 
     rich.print(f"\n[green]All runs complete.[/green] Results in [bold]{RESULTS}/[/bold]")
 

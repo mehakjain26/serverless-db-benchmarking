@@ -1,5 +1,7 @@
 # pyright: reportIndexIssue=false
 # pyright: reportOptionalSubscript=false
+import argparse
+
 import rich
 from ibmcloudant.cloudant_v1 import DesignDocument, DesignDocumentViewsMapReduce
 
@@ -57,7 +59,18 @@ DESIGN_DOCS = {
 
 
 def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--clear", action="store_true", help="Delete and recreate the database before setting up design docs")
+    args = p.parse_args()
+
     client = get_client()
+
+    if args.clear:
+        try:
+            client.delete_database(db=DB)
+            rich.print(f"  [dim]deleted[/dim]  database '{DB}'")
+        except Exception:
+            rich.print(f"  [dim]not found[/dim]  database '{DB}'")
 
     try:
         client.put_database(db=DB)

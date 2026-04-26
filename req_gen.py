@@ -38,6 +38,11 @@ class RequestType(str, Enum):
     # instances writing to local disk.
     BULK_UPDATE_DEPARTURES = "bulk_update_departures"
 
+    # Triple full-scan aggregation with correlated subquery — maximises CPU
+    # pressure without returning data (LIMIT 1). Not included in the random
+    # mix; use --op triple_agg to stress compute explicitly.
+    TRIPLE_AGG = "triple_agg"
+
 
 @dataclass
 class Request:
@@ -71,6 +76,8 @@ def build(rtype: RequestType, catalog: "list[dict]") -> Request:
             "trip_id": entry["trip_id"],
             "shift": G.WRITE_SHIFT_SECS,
         }
+    elif rtype == RequestType.TRIPLE_AGG:
+        params = {"transport_id": t}
     else:
         params = {}
         

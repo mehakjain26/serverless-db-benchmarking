@@ -40,12 +40,17 @@ class BenchmarkTasks:
     def t_bulk_update(self):
         self.run_op(RequestType.BULK_UPDATE_DEPARTURES)
 
+    @task(1)
+    def t_triple_agg(self):
+        self.run_op(RequestType.TRIPLE_AGG)
+
     _OP_TASKS = {
         "point_read": t_point_read,
         "next_departures": t_next_departures,
         "large_scan": t_large_scan,
         "trips_per_route": t_trips_per_route,
         "bulk_update_departures": t_bulk_update,
+        "triple_agg": t_triple_agg,
     }
 
     _bench_op = os.environ.get("BENCH_OP")

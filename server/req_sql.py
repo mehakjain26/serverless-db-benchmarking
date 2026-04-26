@@ -54,6 +54,38 @@ SQL = {
         WHERE transport_id = %(transport_id)s
           AND gtfs_trip_id = %(trip_id)s;
     """,
+    RequestType.TRIPLE_AGG: """
+        SELECT
+            MAX(st.departure_time) - MIN(st.departure_time)  AS time_spread,
+            COUNT(*)                                          AS total,
+            AVG(st.departure_time)                           AS avg_dep,
+            STDDEV(st.departure_time)                        AS stddev_dep,
+            (SELECT COUNT(*) FROM stop_times st2
+             WHERE st2.transport_id = %(transport_id)s
+               AND st2.departure_time > (
+                   SELECT AVG(departure_time) FROM stop_times st3
+                   WHERE st3.transport_id = %(transport_id)s
+               )
+            )                                                 AS above_avg,
+            (SELECT COUNT(*) FROM stop_times st4
+             WHERE st4.transport_id = %(transport_id)s
+               AND st4.departure_time < (
+                   SELECT AVG(departure_time) FROM stop_times st5
+                   WHERE st5.transport_id = %(transport_id)s
+               )
+            )                                                 AS below_avg,
+            (SELECT STDDEV(st6.departure_time)
+             FROM stop_times st6
+             JOIN stop_times st7
+               ON st6.gtfs_trip_id = st7.gtfs_trip_id
+              AND st6.transport_id  = st7.transport_id
+             WHERE st6.transport_id = %(transport_id)s
+             LIMIT 50000
+            )                                                 AS join_stddev
+        FROM stop_times st
+        WHERE st.transport_id = %(transport_id)s
+        LIMIT 1;
+    """,
 }
 
 WRITES = {RequestType.BULK_UPDATE_DEPARTURES}

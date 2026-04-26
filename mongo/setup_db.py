@@ -1,3 +1,5 @@
+import argparse
+
 import rich
 from pymongo import ASCENDING, MongoClient
 
@@ -20,8 +22,16 @@ INDICES = [
 
 
 def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--clear", action="store_true", help="Drop all documents before setting up indices")
+    args = p.parse_args()
+
     client = MongoClient(SG.MONGO["uri"])
     col = client[SG.MONGO["db"]][SG.MONGO["collection"]]
+
+    if args.clear:
+        result = col.delete_many({})
+        rich.print(f"  [dim]cleared[/dim]  {result.deleted_count} documents")
 
     for name, fields in INDICES:
         key_pattern = {f: ASCENDING for f in fields}
