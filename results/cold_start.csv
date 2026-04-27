@@ -1,0 +1,6 @@
+service,sample,warm_rtt,cold_rtt,init_overhead,db_wakeup
+mongo,1,475.49,572.5,nan,97.0
+mongo,2,489.32,531.11,nan,41.78
+mongo,3,475.74,550.74,nan,75.0
+mongo,4,467.1,554.06,nan,86.96
+mongo,5,461.96,543.72,nan,81.75

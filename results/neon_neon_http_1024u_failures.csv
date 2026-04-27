@@ -1,0 +1,6 @@
+Method,Name,Error,Occurrences
+GET,point_read,HTTPError('429 Client Error: Too Many Requests for url: point_read'),921
+GET,trips_per_route,HTTPError('429 Client Error: Too Many Requests for url: trips_per_route'),78
+GET,bulk_update_departures,HTTPError('429 Client Error: Too Many Requests for url: bulk_update_departures'),101
+GET,next_departures,HTTPError('429 Client Error: Too Many Requests for url: next_departures'),728
+GET,large_scan,HTTPError('429 Client Error: Too Many Requests for url: large_scan'),192
