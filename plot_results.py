@@ -245,7 +245,7 @@ def fig_latency_bars(df: pd.DataFrame, labels: dict, show: bool) -> None:
 
 def fig_throughput(df: pd.DataFrame, labels: dict, show: bool) -> None:
     out = subdir("throughput")
-    agg = df.groupby(["adapter", "mode", "users"])[["rps", "success_rps"]].mean().reset_index()
+    agg = df.groupby(["adapter", "mode", "users"])[["rps", "success_rps"]].sum().reset_index()
 
     for (adapter, mode), mdf in agg.groupby(["adapter", "mode"]):
         lbl = run_label(labels, adapter, mode)
@@ -580,32 +580,63 @@ def fig_cold_start(show: bool) -> None:
     if not csv_path.exists():
         return
     out = subdir("cold_start")
-    df = pd.read_csv(csv_path).dropna(subset=["cold_ms"])
+    df = pd.read_csv(csv_path).dropna(subset=["cold_rtt"])
     if df.empty:
         return
 
     if "service" not in df.columns:
         df["service"] = "postgres"
 
-    agg = df.groupby("service")["cold_ms"].mean().reset_index()
     colors = ["#4C72B0", "#DD8452", "#55A868", "#C44E52", "#8172B2", "#937860"]
 
-    fig, ax = plt.subplots(figsize=(max(5, len(agg) * 1.5), 4))
-    fig.suptitle("Cold Start Latency by Service", fontsize=13, fontweight="bold")
+    agg_raw    = df.dropna(subset=["cold_rtt"]).groupby("service")["cold_rtt"].mean().reset_index()
+    agg_warm   = df.dropna(subset=["warm_rtt"]).groupby("service")["warm_rtt"].mean().reset_index()
+    agg_wakeup = df.dropna(subset=["db_wakeup"]).groupby("service")["db_wakeup"].mean().reset_index()
+    merged = agg_raw.merge(agg_warm, on="service").merge(agg_wakeup, on="service")
 
-    bars = ax.bar(agg["service"], agg["cold_ms"], color=colors[:len(agg)], width=0.5)
-    for bar, val in zip(bars, agg["cold_ms"]):
-        ax.text(
-            bar.get_x() + bar.get_width() / 2, bar.get_height() + 10,
-            f"{val:.0f} ms", ha="center", va="bottom", fontsize=9,
-        )
+    services = merged["service"].tolist()
+    x = range(len(services))
+    bar_w = 0.35
 
-    ax.set_ylabel("avg cold start (ms)", fontsize=11)
-    ax.set_axisbelow(True)
-    ax.grid(True, axis="y")
-    ax.set_ylim(bottom=0)
-    fig.tight_layout()
-    save(fig, out / "cold_start.png", show)
+    def _annotate(ax, bars, vals, max_val):
+        for bar, val in zip(bars, vals):
+            ax.text(
+                bar.get_x() + bar.get_width() / 2, bar.get_height() + max_val * 0.02,
+                f"{val:.0f}", ha="center", va="bottom", fontsize=8,
+            )
+
+    # Graph 1: warm vs cold
+    max1 = max(merged["warm_rtt"].max(), merged["cold_rtt"].max())
+    fig1, ax1 = plt.subplots(figsize=(max(6, len(services) * 2), 4))
+    fig1.suptitle("Warm vs Cold Start Latency", fontsize=13, fontweight="bold")
+    b1 = ax1.bar([i - bar_w / 2 for i in x], merged["warm_rtt"], width=bar_w, label="Warm",       color="#FF9800")
+    b2 = ax1.bar([i + bar_w / 2 for i in x], merged["cold_rtt"], width=bar_w, label="Cold Start",  color="#00BCD4")
+    _annotate(ax1, b1, merged["warm_rtt"], max1)
+    _annotate(ax1, b2, merged["cold_rtt"], max1)
+    ax1.set_xticks(list(x))
+    ax1.set_xticklabels(services, fontsize=10)
+    ax1.set_ylabel("latency (ms)", fontsize=11)
+    ax1.legend(fontsize=9)
+    ax1.set_axisbelow(True)
+    ax1.grid(True, axis="y")
+    ax1.set_ylim(bottom=0, top=max1 * 1.2)
+    fig1.tight_layout()
+    save(fig1, out / "cold_start_warm_vs_cold.png", show)
+
+    # Graph 2: DB Wakeup only
+    max2 = agg_wakeup["db_wakeup"].max()
+    fig2, ax2 = plt.subplots(figsize=(max(6, len(services) * 2), 4))
+    fig2.suptitle("DB Wakeup (Cold - Warm)", fontsize=13, fontweight="bold")
+    b3 = ax2.bar(list(x), merged["db_wakeup"], width=0.5, label="DB Wakeup", color="#8172B2")
+    _annotate(ax2, b3, merged["db_wakeup"], max2)
+    ax2.set_xticks(list(x))
+    ax2.set_xticklabels(services, fontsize=10)
+    ax2.set_ylabel("DB Wakeup (ms)", fontsize=11)
+    ax2.set_axisbelow(True)
+    ax2.grid(True, axis="y")
+    ax2.set_ylim(bottom=0, top=max2 * 1.2)
+    fig2.tight_layout()
+    save(fig2, out / "cold_start_wakeup.png", show)
 
 
 def fig_mode_comparison(df: pd.DataFrame, labels: dict, show: bool) -> None:
@@ -686,12 +717,18 @@ def fig_mode_comparison(df: pd.DataFrame, labels: dict, show: bool) -> None:
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--no-show", action="store_true")
+    p.add_argument("--cold-start", action="store_true", help="only generate cold start graphs")
     return p.parse_args()
 
 
 def main():
     args = parse_args()
     show = not args.no_show
+
+    if args.cold_start:
+        fig_cold_start(show)
+        rich.print(f"\n[green]Done.[/green] Figures in [bold]{FIGURES_DIR}/[/bold]")
+        return
 
     df = load_stats()
     if df.empty:
