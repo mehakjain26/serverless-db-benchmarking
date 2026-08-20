@@ -149,6 +149,17 @@ Output charts are saved directly under the `results/figures/` folder.
 
 ---
 
+## 🤖 AI Agents & Agentic Engineering
+
+This repository leverages **Agentic Coding Workflows** and AI Agent tooling for system architecture refactoring, automated benchmark orchestration, and security sanitization:
+
+- **Architectural Refactoring**: Autonomous package isolation (`core/`, `database_clients/`, `adapters/`, `infrastructure/`, `analytics/`) and clean modular separation.
+- **Security & Secret Sanitization**: Automated parameterization of database credentials into `.env.example` templates and dynamic environment lookups (`os.getenv`), eliminating hardcoded keys across multi-cloud Terraform setups.
+- **Automated Benchmarking & Analytics**: Agent-assisted synthetic GTFS load generation (`req_gen.py`), Locust load testing harness automation, and automated plot generation (`plot_results.py`).
+- **IaC Verification & System Documentation**: Multi-cloud Infrastructure as Code (Terraform) validation, cross-account IAM policy generation, and empirical performance evaluation documentation ([ARCHITECTURE.md](docs/ARCHITECTURE.md), [BENCHMARK_RESULTS.md](docs/BENCHMARK_RESULTS.md)).
+
+---
+
 ## 👥 Authors & Presentation
 - **Mehak Jain**
 - **Raghavan Balanathan**
