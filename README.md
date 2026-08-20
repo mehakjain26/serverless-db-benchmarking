@@ -32,27 +32,27 @@ This project empirically compares five prominent database options under realisti
 
 ```mermaid
 flowchart TB
-    subgraph Client/Test Layer
+    subgraph "Client / Test Layer"
         Harness[Locust Benchmark Harness]
     end
 
-    subgraph Serverless Compute Layer (AWS Account A)
+    subgraph "Serverless Compute Layer (AWS Account A)"
         Lambda[AWS Lambda Query Functions]
         API[Lambda Function URLs]
     end
 
-    subgraph Data Access Layer
-        subgraph Relational Backends
+    subgraph "Data Access Layer"
+        subgraph "Relational Backends"
             IBM_PG[(IBM Cloud PostgreSQL)]
             Neon_PG[(Neon Serverless PostgreSQL)]
         end
         
-        subgraph Document Backends
+        subgraph "Document Backends"
             Mongo[(MongoDB Atlas)]
             Cloudant[(IBM Cloudant)]
         end
         
-        subgraph Key-Value Backends
+        subgraph "Key-Value Backends"
             Dynamo[(Amazon DynamoDB - Account B)]
         end
     end
@@ -69,49 +69,15 @@ flowchart TB
 
 ---
 
-## 📂 Reorganized Repository Structure
+## 📂 Repository Structure
 
-```
-├── README.md                 # Project showcase (this file)
-├── pyproject.toml            # Python build system metadata
-├── requirements.txt          # Python dependencies
-├── .env.example              # Environment variables template
-├── bench.py                  # CLI benchmark orchestration entrypoint
-├── cold_start.py            # CLI cold start measurement entrypoint
-├── core/                     # Isolated Core Engine Package
-│   ├── req_gen.py            # GTFS synthetic workload generator
-│   ├── globals.py            # Global settings and workload weights
-│   ├── locust_base.py        # Base Locust benchmark User class
-│   ├── diurnal_shape.py      # Diurnal curve traffic generator
-│   ├── fetch_catalog.py      # Ingestion helper to scan dataset catalog
-│   ├── catalog_cache.json    # Cached keys to optimize query generation
-│   └── codebook.toml         # Benchmark metadata
-├── database_clients/         # Database Query Execution Engine
-│   ├── README.md             # Query adapters documentation
-│   ├── db_config.py          # Centralized database connection configurations
-│   ├── req_sql.py            # PostgreSQL & Neon query execution engine
-│   ├── req_mongo.py          # MongoDB Atlas document query adapter
-│   ├── req_cloudant.py       # IBM Cloudant CouchDB query adapter
-│   └── req_dynamodb.py       # Amazon DynamoDB key-value single-table adapter
-├── adapters/                 # Database schema scripts & ingestion loaders
-│   ├── README.md             # Ingestion & schemas documentation
-│   ├── cloudant/             # IBM Cloudant view definitions & loader
-│   ├── dynamodb/             # DynamoDB table definitions & query helpers
-│   ├── mongo/                # MongoDB setup & catalog scripts
-│   └── sql/                  # PostgreSQL schemas & SSL certificates
-├── infrastructure/           # Multi-Cloud IaC (Terraform) and Serverless Compute
-│   ├── README.md             # Infrastructure deployment guide
-│   ├── terraform/            # IaC scripts (provider, variables, resources)
-│   ├── lambda/               # Serverless AWS Lambda handler code
-│   └── scripts/              # Lambda zip-packaging build shell scripts
-├── analytics/                # Data Analytics & Plot generation scripts
-│   ├── plot_results.py       # Generates latency, throughput, and error graphs
-│   └── plot_diurnal.py       # Generates diurnal test analytical graphs
-├── docs/                     # Academic Specifications
-│   ├── ARCHITECTURE.md       # Technical design spec (workloads, schemas)
-│   └── BENCHMARK_RESULTS.md  # Detailed research outcomes & analysis
-└── results/                  # Locust CSV statistics, execution logs & output plots
-```
+- **`README.md`**: Project showcase with dynamic badges, system architecture diagrams, key research findings, and quickstart commands.
+- **`core/`**: Workload generator ([req_gen.py](core/req_gen.py)), Locust base classes, and diurnal curve engines.
+- **`database_clients/`**: Query execution adapters for PostgreSQL, Neon, MongoDB, Cloudant, and DynamoDB.
+- **`adapters/`**: Schemas, index creation scripts, and data loaders.
+- **`infrastructure/`**: Modular Terraform (IaC) files (`provider.tf`, `dynamo.tf`, `neon.tf`, `ibm_postgres.tf`) and AWS Lambda handlers.
+- **`analytics/`**: Latency, throughput, and error plot generation scripts.
+- **`docs/`**: Technical architecture spec ([ARCHITECTURE.md](docs/ARCHITECTURE.md)) and empirical benchmark evaluation results ([BENCHMARK_RESULTS.md](docs/BENCHMARK_RESULTS.md)).
 
 ---
 
