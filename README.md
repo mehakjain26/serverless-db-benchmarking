@@ -6,6 +6,7 @@
 [![MongoDB Atlas](https://img.shields.io/badge/Database-MongoDB%20Atlas-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/atlas)
 [![Amazon DynamoDB](https://img.shields.io/badge/Database-Amazon%20DynamoDB-4053F6?logo=amazondynamodb&logoColor=white)](https://aws.amazon.com/dynamodb/)
 [![Locust](https://img.shields.io/badge/Testing-Locust-B4A228?logo=python&logoColor=white)](https://locust.io/)
+[![Presentation](https://img.shields.io/badge/Google_Slides-Presentation-EA4335?logo=googleslides&logoColor=white)](https://docs.google.com/presentation/d/1G8OUM8Bu_zObg03lvbxhDjvKZT5IqSJHlNo0c8yxtC4/edit?usp=sharing)
 
 This repository hosts **`gtfs-bench`**, a cloud infrastructure database benchmarking suite designed to evaluate the trade-offs of relational, document, serverless SQL, and key-value database paradigms in serverless microservices. Using public transit data structured under the **General Transit Feed Specification (GTFS)**, this framework evaluates how database selection impacts latency, throughput, connection overhead, cold-start times, and overall cost efficiency.
 
@@ -148,9 +149,11 @@ Output charts are saved directly under the `results/figures/` folder.
 
 ---
 
-## 👥 Authors
+## 👥 Authors & Presentation
 - **Mehak Jain**
 - **Raghavan Balanathan**
 - **Zach Heskett**
+
+📊 **Project Presentation**: [CS 551 Google Slides Presentation Deck](https://docs.google.com/presentation/d/1G8OUM8Bu_zObg03lvbxhDjvKZT5IqSJHlNo0c8yxtC4/edit?usp=sharing)
 
 Developed as a Cloud Computing research project (CS 551). For detailed queries regarding schema designs or performance metrics, refer to the [docs/](docs/) directory.
