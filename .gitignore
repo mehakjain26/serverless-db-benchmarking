@@ -1,23 +1,49 @@
-# --- Python ---
+# --- Python & Build Caches ---
 __pycache__/
 *.py[cod]
 *$py.class
-*.egg-info
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Virtual Environments & Credentials ---
 .venv/
 venv/
 myvenv/
+env/
 .env
+.env.local
 aws_key.txt
+*.pem
+*.key
 
-# --- Terraform ---
+# --- IDEs, Editors & AI Workspaces ---
+.vscode/
+.idea/
+.gemini/
+brain/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.history/
+
+# --- Terraform & Cloud Infrastructure ---
 .terraform/
 *.tfstate
 *.tfstate.backup
 *.tfvars
 *.tfvars.json
 .terraform.lock.hcl
+.aws/
 
-# --- Project Data & Benchmarks ---
+# --- Project Data & Temporary Artifacts ---
 data/
 logs/
 **/*.zip
@@ -28,9 +54,4 @@ lambda_function/
 "* copy.py"
 "**/test.py"
 "*_old.py"
-
-# --- OS ---
-.DS_Store
-Thumbs.db
-.history/
 *.log

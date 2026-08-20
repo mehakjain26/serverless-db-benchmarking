@@ -5,9 +5,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "gtfs-bench"
 version = "0.1.0"
+description = "Scalability and Performance Analysis of Data Access Patterns in Serverless Applications"
+readme = "README.md"
+requires-python = ">=3.9"
 
 [tool.setuptools.packages.find]
-include = ["server*"]
-
-[tool.setuptools]
-py-modules = ["req_gen", "globals", "locust_base"]
+include = ["core*", "database_clients*", "adapters*", "analytics*", "infrastructure*"]
